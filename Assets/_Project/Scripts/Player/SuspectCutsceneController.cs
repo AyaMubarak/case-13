@@ -1,5 +1,6 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.AI;
+using System;
 
 public class SeparateInterrogationManager : MonoBehaviour
 {
@@ -27,6 +28,8 @@ public class SeparateInterrogationManager : MonoBehaviour
     public AudioSource detectiveAudioFemale; // صوت المحقق (أنثى)
 
     private int currentSuspectTurn = 1; // 1 = دور المتهم الأول, 2 = دور المتهم الثاني
+    private bool playerSetupComplete = false; // يتم تعيينها بعد انتهاء اختيار اللاعب
+    private bool suspectsStarted = false; // تتبع ما إذا كنا قد بدأنا الحركة
 
     void Start()
     {
@@ -37,8 +40,15 @@ public class SeparateInterrogationManager : MonoBehaviour
         if (suspect1.suspectCamera != null) suspect1.suspectCamera.gameObject.SetActive(false);
         if (suspect2.suspectCamera != null) suspect2.suspectCamera.gameObject.SetActive(false);
 
-        // بدء دخول المتهم الأول فقط في البداية
-        StartSuspectTurn(suspect1);
+        // الاستماع لحدث انتهاء اختيار اللاعب
+        // ابحث عن GameStateManager أو استخدم onGameStart callback
+        if (RoleSelectionUI.OnPlayerSetupComplete != null)
+        {
+            RoleSelectionUI.OnPlayerSetupComplete += OnPlayerSetupCompleted;
+        }
+
+        // إذا كنت تستخدم event مختلف، قم بتعديل هذا السطر
+        // مثلاً: PlayerProfile.LocalPlayer.OnProfileChanged += OnPlayerSetupCompleted;
     }
 
     void InitializeSuspect(SuspectData suspect)
@@ -47,6 +57,26 @@ public class SeparateInterrogationManager : MonoBehaviour
         {
             suspect.agent = suspect.suspectObject.GetComponent<NavMeshAgent>();
             suspect.animator = suspect.suspectObject.GetComponent<Animator>();
+            
+            // التأكد من أن المتهم مغلق وغير متحرك في البداية
+            if (suspect.agent != null)
+            {
+                suspect.agent.enabled = false;
+            }
+        }
+    }
+
+    // يتم استدعاء هذه الدالة عندما ينتهي اللاعب من اختيار الدور والجنس والاسم
+    public void OnPlayerSetupCompleted()
+    {
+        Debug.Log("[INTERROGATION] Player setup complete - Starting suspect animations");
+        playerSetupComplete = true;
+        
+        if (!suspectsStarted)
+        {
+            suspectsStarted = true;
+            // بدء دخول المتهم الأول فقط بعد اكتمال اختيار اللاعب
+            StartSuspectTurn(suspect1);
         }
     }
 
@@ -61,6 +91,10 @@ public class SeparateInterrogationManager : MonoBehaviour
 
     void Update()
     {
+        // لا تفعل أي حركة للمتهمين إذا لم ينته اللاعب من الاختيار
+        if (!playerSetupComplete)
+            return;
+
         // --- متابعة دور المتهم الأول ---
         if (currentSuspectTurn == 1 && !suspect1.hasReached)
         {
@@ -131,5 +165,14 @@ public class SeparateInterrogationManager : MonoBehaviour
     {
         currentSuspectTurn = 2;
         StartSuspectTurn(suspect2);
+    }
+
+    private void OnDestroy()
+    {
+        // فك الربط عند الحذف
+        if (RoleSelectionUI.OnPlayerSetupComplete != null)
+        {
+            RoleSelectionUI.OnPlayerSetupComplete -= OnPlayerSetupCompleted;
+        }
     }
 }
