@@ -7,80 +7,96 @@ public class CaseBriefingUI : MonoBehaviour
 {
     [Header("UI Panels")]
     public GameObject briefingPanel;
-    
+
     [Header("Text Elements")]
     public TextMeshProUGUI titleText;
     public TextMeshProUGUI storyText;
-    
+
     [Header("Buttons")]
-    public GameObject continueButton; // زر المتابعة
-    
+    public GameObject continueButton;
+
     [Header("Story Settings")]
     public string caseTitle = "CASE 13: THE MIDNIGHT HEIST";
+
     [TextArea(5, 10)]
-    public string backStory = "A high-tech digital keycard was stolen from the central vault at exactly 02:15 AM. We have two suspects in custody, both employees with high security clearance. Your job is to interrogate them, find the contradictions in their alibis using evidence, and identify the true culprit.";
-    
+    public string backStory =
+        "A high-tech digital keycard was stolen from the central vault at exactly 02:15 AM. " +
+        "We have two suspects in custody, both employees with high security clearance. " +
+        "Your job is to interrogate them, find the contradictions in their alibis using evidence, " +
+        "and identify the true culprit.";
+
     public float typingSpeed = 0.05f;
 
     private void Start()
     {
-        // عرض اللوحة عند بداية المشهد
+        // إظهار لوحة الـ Briefing
         if (briefingPanel != null)
         {
             briefingPanel.SetActive(true);
         }
 
+        // إخفاء زر Continue أثناء الكتابة
         if (continueButton != null)
         {
-            continueButton.SetActive(false); // إخفاء الزر حتى تنتهي الكتابة
+            continueButton.SetActive(false);
         }
 
+        // وضع عنوان القضية
         if (titleText != null)
         {
             titleText.text = caseTitle;
         }
 
+        // فتح الماوس
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
-        StartCoroutine(TypewriterEffect(backStory));
+        // بدء الكتابة التدريجية
+        if (storyText != null)
+        {
+            StartCoroutine(TypewriterEffect(backStory));
+        }
+        else
+        {
+            // إذا لم يوجد Story Text، أظهر الزر مباشرة
+            if (continueButton != null)
+            {
+                continueButton.SetActive(true);
+            }
+        }
     }
 
     private IEnumerator TypewriterEffect(string fullText)
     {
         storyText.text = "";
-        
-        // تشغيل صوت كتابة الآلة الكاتبة إذا أردت (اختياري)
-        // AudioClip typeClip = Resources.Load<AudioClip>("Audio/typewriter_sound");
 
         foreach (char c in fullText)
         {
             storyText.text += c;
-            
-            // if (typeClip != null) AudioSource.PlayClipAtPoint(typeClip, Camera.main.transform.position);
-            
+
             yield return new WaitForSeconds(typingSpeed);
         }
 
-        // إظهار زر المتابعة بعد انتهاء النص
+        // إظهار زر Continue بعد انتهاء النص
         if (continueButton != null)
         {
             continueButton.SetActive(true);
         }
     }
 
-    // تُربط هذه الدالة بزر المتابعة (Continue Button)
+    // هذه الدالة يتم ربطها بزر Continue
     public void StartInvestigation()
     {
+        // إخفاء لوحة الـ Briefing
         if (briefingPanel != null)
         {
             briefingPanel.SetActive(false);
         }
-        
-        // هنا يمكنك تفعيل شاشة اختيار الأدوار أو بدء اللعب
-        if (RoleSelectionUI.OnPlayerSetupComplete != null)
-        {
-            // إذا كانت لوحة اختيار الأدوار منفصلة، قم بتفعيلها هنا
-        }
+
+        // إغلاق الماوس استعداداً للعب
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
+        Debug.Log("[CASE] Briefing completed. Investigation started.");
     }
 }

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using Unity.Netcode;
 
 public class PlayerSetupUI : MonoBehaviour
 {

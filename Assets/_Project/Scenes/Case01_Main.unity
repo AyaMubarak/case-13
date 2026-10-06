@@ -27606,6 +27606,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -8148717428315727390, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
+--- !u!1 &1200567772
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1200567773}
+  m_Layer: 0
+  m_Name: Evidence Spawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1200567773
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1200567772}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 3.30782, y: 0.75765, z: -9.5635}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1202278161 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -8073457199576636281, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
@@ -64449,3 +64480,4 @@ SceneRoots:
   - {fileID: 1840881164}
   - {fileID: 396650067}
   - {fileID: 2126806507}
+  - {fileID: 1200567773}
