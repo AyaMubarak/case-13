@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
@@ -22,6 +22,12 @@ public class RoleSelectionUI : MonoBehaviour
 
     [Header("HUD Badge (Optional)")]
     public TextMeshProUGUI hudRoleBadgeText;
+
+    [Header("Spawn Points (أماكن البداية لكل دور)")]
+    public Transform fieldDetectiveSpawn;
+    public Transform forensicsSpawn;
+    public Transform digitalAnalystSpawn;
+    public Transform interrogatorSpawn;
 
     private DetectiveGender selectedGender = DetectiveGender.Female;
     private DetectiveRole selectedRole = DetectiveRole.ForensicsExpert;
@@ -67,9 +73,13 @@ public class RoleSelectionUI : MonoBehaviour
         if (maleBtn != null) maleBtn.transform.localScale = (selectedGender == DetectiveGender.Male) ? Vector3.one * 1.15f : Vector3.one;
     }
 
+    public static event System.Action OnPlayerSetupComplete;
+
     public void SelectRoleAndDeploy(DetectiveRole role)
     {
         selectedRole = role;
+
+        OnPlayerSetupComplete?.Invoke();
 
         // 1. البحث عن اللاعب (حتى لو كان معطلاً في بداية المشهد) وتطبيق الدور والجنس عليه
         PlayerProfile profile = PlayerProfile.LocalPlayer;
@@ -86,6 +96,19 @@ public class RoleSelectionUI : MonoBehaviour
             if (codenameInput != null && !string.IsNullOrEmpty(codenameInput.text))
             {
                 profile.agentCodename = codenameInput.text;
+            }
+
+            // نقل اللاعب إلى مكانه المخصص حسب الدور قبل تفعيله
+            Transform targetSpawn = GetSpawnPointForRole(selectedRole);
+            if (targetSpawn != null)
+            {
+                CharacterController cc = profile.GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+
+                profile.transform.position = targetSpawn.position;
+                profile.transform.rotation = targetSpawn.rotation;
+
+                if (cc != null) cc.enabled = true;
             }
 
             // تفعيل كائن اللاعب وإظهاره فوراً في المشهد
@@ -120,5 +143,17 @@ public class RoleSelectionUI : MonoBehaviour
         // 4. قفل الماوس للبدء في تحريك الكاميرا والتحقيق
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+    }
+
+    private Transform GetSpawnPointForRole(DetectiveRole role)
+    {
+        switch (role)
+        {
+            case DetectiveRole.FieldDetective: return fieldDetectiveSpawn;
+            case DetectiveRole.ForensicsExpert: return forensicsSpawn;
+            case DetectiveRole.DigitalAnalyst: return digitalAnalystSpawn;
+            case DetectiveRole.Interrogator: return interrogatorSpawn;
+            default: return null;
+        }
     }
 }

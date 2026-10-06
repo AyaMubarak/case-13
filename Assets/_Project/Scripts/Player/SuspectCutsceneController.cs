@@ -42,10 +42,7 @@ public class SeparateInterrogationManager : MonoBehaviour
 
         // الاستماع لحدث انتهاء اختيار اللاعب
         // ابحث عن GameStateManager أو استخدم onGameStart callback
-        if (RoleSelectionUI.OnPlayerSetupComplete != null)
-        {
-            RoleSelectionUI.OnPlayerSetupComplete += OnPlayerSetupCompleted;
-        }
+        RoleSelectionUI.OnPlayerSetupComplete += OnPlayerSetupCompleted;
 
         // إذا كنت تستخدم event مختلف، قم بتعديل هذا السطر
         // مثلاً: PlayerProfile.LocalPlayer.OnProfileChanged += OnPlayerSetupCompleted;
@@ -57,7 +54,7 @@ public class SeparateInterrogationManager : MonoBehaviour
         {
             suspect.agent = suspect.suspectObject.GetComponent<NavMeshAgent>();
             suspect.animator = suspect.suspectObject.GetComponent<Animator>();
-            
+
             // التأكد من أن المتهم مغلق وغير متحرك في البداية
             if (suspect.agent != null)
             {
@@ -71,7 +68,7 @@ public class SeparateInterrogationManager : MonoBehaviour
     {
         Debug.Log("[INTERROGATION] Player setup complete - Starting suspect animations");
         playerSetupComplete = true;
-        
+
         if (!suspectsStarted)
         {
             suspectsStarted = true;
@@ -134,30 +131,40 @@ public class SeparateInterrogationManager : MonoBehaviour
         if (suspect1.suspectCamera != null) suspect1.suspectCamera.gameObject.SetActive(false);
         if (suspect2.suspectCamera != null) suspect2.suspectCamera.gameObject.SetActive(false);
 
-        // تفعيل كاميرا المتهم المطلوب وتشكيل صوته
-        if (suspectIndex == 1)
+        // تفعيل كاميرا المتهم المطلوب
+        SuspectData targetSuspect = (suspectIndex == 1) ? suspect1 : suspect2;
+        if (targetSuspect.suspectCamera != null) targetSuspect.suspectCamera.gameObject.SetActive(true);
+
+        // بدء تسلسل الحوار
+        StartCoroutine(PlayDialogueSequence(targetSuspect));
+    }
+
+    private System.Collections.IEnumerator PlayDialogueSequence(SuspectData suspect)
+    {
+        // 1. تشغيل صوت المحقق أولاً بناءً على الجنس
+        AudioSource detectiveVoice = GetDetectiveVoice();
+        if (detectiveVoice != null && detectiveVoice.clip != null)
         {
-            if (suspect1.suspectCamera != null) suspect1.suspectCamera.gameObject.SetActive(true);
-            if (suspect1.suspectVoiceAudio != null) suspect1.suspectVoiceAudio.Play(); // تشغيل فويس المتهم الأول
+            detectiveVoice.Play();
+            yield return new WaitForSeconds(detectiveVoice.clip.length + 0.5f); // انتظار حتى ينتهي الصوت مع نصف ثانية إضافية
         }
-        else if (suspectIndex == 2)
+
+        // 2. تشغيل صوت المتهم بعد الانتهاء
+        if (suspect.suspectVoiceAudio != null)
         {
-            if (suspect2.suspectCamera != null) suspect2.suspectCamera.gameObject.SetActive(true);
-            if (suspect2.suspectVoiceAudio != null) suspect2.suspectVoiceAudio.Play(); // تشغيل فويس المتهم الثاني
+            suspect.suspectVoiceAudio.Play();
         }
     }
 
-    // دالة لتشغيل صوت المحقق (حسب الجنس: 1 للذكر، 2 للأنثى)
-    public void PlayDetectiveVoice(int genderType)
+    private AudioSource GetDetectiveVoice()
     {
-        if (genderType == 1 && detectiveAudioMale != null)
+        // جلب صوت المحقق المناسب حسب الجنس المختار
+        if (PlayerProfile.LocalPlayer != null)
         {
-            detectiveAudioMale.Play();
+            if (PlayerProfile.LocalPlayer.gender == DetectiveGender.Male) return detectiveAudioMale;
+            else return detectiveAudioFemale;
         }
-        else if (genderType == 2 && detectiveAudioFemale != null)
-        {
-            detectiveAudioFemale.Play();
-        }
+        return detectiveAudioMale; // افتراضي
     }
 
     // دالة للانتقال اليدوي للدور التالي (مثلاً عند الضغط على زر أو انتهاء الحوار)
@@ -170,9 +177,6 @@ public class SeparateInterrogationManager : MonoBehaviour
     private void OnDestroy()
     {
         // فك الربط عند الحذف
-        if (RoleSelectionUI.OnPlayerSetupComplete != null)
-        {
-            RoleSelectionUI.OnPlayerSetupComplete -= OnPlayerSetupCompleted;
-        }
+        RoleSelectionUI.OnPlayerSetupComplete -= OnPlayerSetupCompleted;
     }
 }

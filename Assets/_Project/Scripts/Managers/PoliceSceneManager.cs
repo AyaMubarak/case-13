@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.AI;
 
 public class PoliceSceneManager : MonoBehaviour
@@ -11,6 +11,8 @@ public class PoliceSceneManager : MonoBehaviour
     private bool hasReachedChair = false;
     private bool dialoguePlayed = false;
 
+    private bool canStartMoving = false;
+
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
@@ -19,14 +21,30 @@ public class PoliceSceneManager : MonoBehaviour
         // ضبط الارتفاع تلقائياً لكي لا تطير الشخصية
         if (agent != null)
         {
+            agent.enabled = false; // تعطيل حتى يبدأ دورها
+        }
+
+        RoleSelectionUI.OnPlayerSetupComplete += OnSetupComplete;
+    }
+
+    private void OnSetupComplete()
+    {
+        if (agent != null)
+        {
             agent.enabled = true;
         }
 
-        // البدء بالمشي نحو الكرسي فوراً
+        // البدء بالمشي نحو الكرسي
         if (chairTarget != null && agent != null)
         {
             agent.SetDestination(chairTarget.position);
         }
+        canStartMoving = true;
+    }
+
+    private void OnDestroy()
+    {
+        RoleSelectionUI.OnPlayerSetupComplete -= OnSetupComplete;
     }
 
     void Update()

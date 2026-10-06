@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
@@ -24,6 +24,7 @@ public class InterrogationUI : MonoBehaviour
     public GameObject statementCardPrefab;
 
     private SuspectInterrogation currentSuspect;
+    public static SuspectInterrogation lastInterrogatedSuspect;
 
     private void Awake()
     {
@@ -49,6 +50,19 @@ public class InterrogationUI : MonoBehaviour
         {
             closeDossierBtn.onClick.RemoveAllListeners();
             closeDossierBtn.onClick.AddListener(CloseInterrogation);
+        }
+    }
+
+    private void Update()
+    {
+        // فتح اللوحة عند الضغط على B إذا كان هناك متهم محفوظ
+        if (Input.GetKeyDown(KeyCode.B) && lastInterrogatedSuspect != null)
+        {
+            // لا تفتح إذا كانت مفتوحة مسبقاً
+            if (interrogationPanel != null && !interrogationPanel.activeSelf)
+            {
+                OpenInterrogation(lastInterrogatedSuspect);
+            }
         }
     }
 

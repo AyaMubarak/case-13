@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 public class SuspectInterrogation : MonoBehaviour, IInteractable
 {
@@ -45,20 +45,22 @@ public class SuspectInterrogation : MonoBehaviour, IInteractable
             return;
         }
 
-        // 1. تسجيل أو تحديث الأقوال مع تمرير الصورة الحقيقية (suspectPortrait)
+        // 1. تسجيل أو تحديث الأقوال مع تمرير الصورة الحقيقية
         if (InterrogationManager.Instance != null)
         {
             InterrogationManager.Instance.RecordOrUpdateStatement(suspectName, isAlibiBroken ? brokenAlibiResponse : initialAlibi, suspectPortrait);
         }
 
-        // 2. فتح نافذة الاستجواب الفردية الخاصة بهذا المتهم فوراً
-        if (InterrogationUI.Instance != null)
+        // 2. بدلاً من فتح النافذة فوراً، نكتفي بإظهار إشعار وحفظ المتهم الأخير
+        InterrogationUI.lastInterrogatedSuspect = this;
+        
+        if (UIManager.Instance != null)
         {
-            InterrogationUI.Instance.OpenInterrogation(this);
+            UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED // PRESS [B] TO VIEW DOSSIER");
         }
         else
         {
-            Debug.LogWarning("[INTERROGATION] InterrogationUI.Instance is missing!");
+            Debug.Log("STATEMENT RECORDED // PRESS [B] TO VIEW DOSSIER");
         }
     }
 
