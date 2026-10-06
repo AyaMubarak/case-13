@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Rigidbody), typeof(CapsuleCollider))]
@@ -176,22 +176,8 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // ==========================================
-        // ROTATE PLAYER
+        // ROTATION IS HANDLED BY CAMERA IN FPS
         // ==========================================
-
-        Quaternion targetRotation =
-            Quaternion.LookRotation(
-                desiredDir,
-                Vector3.up
-            );
-
-        rb.MoveRotation(
-            Quaternion.Slerp(
-                rb.rotation,
-                targetRotation,
-                rotationSpeed * Time.fixedDeltaTime
-            )
-        );
     }
 
     // ============================================================

@@ -36,13 +36,14 @@ public class SeparateInterrogationManager : MonoBehaviour
         InitializeSuspect(suspect1);
         InitializeSuspect(suspect2);
 
-        // إغلاق جميع الكاميرات في البداية
+        // إغلاق جميع الكاميرات والمتهمين في البداية حتى يتم جمع الأدلة
         if (suspect1.suspectCamera != null) suspect1.suspectCamera.gameObject.SetActive(false);
         if (suspect2.suspectCamera != null) suspect2.suspectCamera.gameObject.SetActive(false);
+        if (suspect1.suspectObject != null) suspect1.suspectObject.gameObject.SetActive(false);
+        if (suspect2.suspectObject != null) suspect2.suspectObject.gameObject.SetActive(false);
 
-        // الاستماع لحدث انتهاء اختيار اللاعب
-        // ابحث عن GameStateManager أو استخدم onGameStart callback
-        RoleSelectionUI.OnPlayerSetupComplete += OnPlayerSetupCompleted;
+        // الاستماع لحدث جمع كل الأدلة (لا يدخلون إلا بعد جمعها)
+        EvidenceManager.OnAllEvidenceCollected += OnAllEvidenceCollected;
 
         // إذا كنت تستخدم event مختلف، قم بتعديل هذا السطر
         // مثلاً: PlayerProfile.LocalPlayer.OnProfileChanged += OnPlayerSetupCompleted;
@@ -63,10 +64,15 @@ public class SeparateInterrogationManager : MonoBehaviour
         }
     }
 
-    // يتم استدعاء هذه الدالة عندما ينتهي اللاعب من اختيار الدور والجنس والاسم
-    public void OnPlayerSetupCompleted()
+    // يتم استدعاء هذه الدالة عندما يجمع اللاعب كل الأدلة
+    public void OnAllEvidenceCollected()
     {
-        Debug.Log("[INTERROGATION] Player setup complete - Starting suspect animations");
+        Debug.Log("[INTERROGATION] All evidence collected - Suspects are arriving!");
+        
+        // إظهار المتهمين الآن
+        if (suspect1.suspectObject != null) suspect1.suspectObject.gameObject.SetActive(true);
+        if (suspect2.suspectObject != null) suspect2.suspectObject.gameObject.SetActive(true);
+
         playerSetupComplete = true;
 
         if (!suspectsStarted)
@@ -177,6 +183,6 @@ public class SeparateInterrogationManager : MonoBehaviour
     private void OnDestroy()
     {
         // فك الربط عند الحذف
-        RoleSelectionUI.OnPlayerSetupComplete -= OnPlayerSetupCompleted;
+        EvidenceManager.OnAllEvidenceCollected -= OnAllEvidenceCollected;
     }
 }

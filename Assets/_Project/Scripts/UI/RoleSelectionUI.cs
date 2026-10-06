@@ -23,11 +23,8 @@ public class RoleSelectionUI : MonoBehaviour
     [Header("HUD Badge (Optional)")]
     public TextMeshProUGUI hudRoleBadgeText;
 
-    [Header("Spawn Points (أماكن البداية لكل دور)")]
-    public Transform fieldDetectiveSpawn;
-    public Transform forensicsSpawn;
-    public Transform digitalAnalystSpawn;
-    public Transform interrogatorSpawn;
+    [Header("Random Spawn Points (أماكن البداية العشوائية)")]
+    public Transform[] randomSpawnPoints;
 
     private DetectiveGender selectedGender = DetectiveGender.Female;
     private DetectiveRole selectedRole = DetectiveRole.ForensicsExpert;
@@ -147,13 +144,12 @@ public class RoleSelectionUI : MonoBehaviour
 
     private Transform GetSpawnPointForRole(DetectiveRole role)
     {
-        switch (role)
+        // تم التعديل لاختيار مكان عشوائي بدلاً من مكان مخصص للدور
+        if (randomSpawnPoints != null && randomSpawnPoints.Length > 0)
         {
-            case DetectiveRole.FieldDetective: return fieldDetectiveSpawn;
-            case DetectiveRole.ForensicsExpert: return forensicsSpawn;
-            case DetectiveRole.DigitalAnalyst: return digitalAnalystSpawn;
-            case DetectiveRole.Interrogator: return interrogatorSpawn;
-            default: return null;
+            int randomIndex = Random.Range(0, randomSpawnPoints.Length);
+            return randomSpawnPoints[randomIndex];
         }
+        return null;
     }
 }

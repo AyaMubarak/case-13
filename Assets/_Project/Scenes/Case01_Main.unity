@@ -7779,6 +7779,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 2093029908692104672, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
+--- !u!1 &321723488
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 321723489}
+  m_Layer: 0
+  m_Name: ChairTarget
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &321723489
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 321723488}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1840881165}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &322720228 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4604947023043133584, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
@@ -8146,7 +8177,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraFollow
   target: {fileID: 839023018}
-  cameraOffset: {x: 0, y: 1.5, z: -2.8}
+  cameraOffset: {x: 0, y: 1.6, z: 0.15}
   followSpeed: 25
   mouseSensitivity: 0.08
   touchSensitivity: 0.12
@@ -9021,37 +9052,6 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -29651499627083263, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
---- !u!1 &368197195
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 368197196}
-  m_Layer: 0
-  m_Name: ChairTarget
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &368197196
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 368197195}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1992862927}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &380693270 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4106823379645445047, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
@@ -18818,6 +18818,10 @@ MonoBehaviour:
   digitalAnalystBtn: {fileID: 913687591}
   interrogatorBtn: {fileID: 1010920630}
   hudRoleBadgeText: {fileID: 0}
+  fieldDetectiveSpawn: {fileID: 0}
+  forensicsSpawn: {fileID: 0}
+  digitalAnalystSpawn: {fileID: 0}
+  interrogatorSpawn: {fileID: 0}
 --- !u!114 &855311495
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -28605,7 +28609,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5959bc56c1d2b604288ff25e987f2b8b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PoliceSceneManager
-  chairTarget: {fileID: 368197196}
+  chairTarget: {fileID: 0}
   voiceAudio: {fileID: 0}
 --- !u!195 &1233100193
 NavMeshAgent:
@@ -40467,7 +40471,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5959bc56c1d2b604288ff25e987f2b8b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PoliceSceneManager
-  chairTarget: {fileID: 368197196}
+  chairTarget: {fileID: 0}
   voiceAudio: {fileID: 0}
 --- !u!195 &1762510858
 NavMeshAgent:
@@ -48680,6 +48684,10 @@ PrefabInstance:
       value: 6
       objectReference: {fileID: 0}
     - target: {fileID: 1336448391006035894, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
+      propertyPath: m_Name
+      value: f
+      objectReference: {fileID: 0}
+    - target: {fileID: 1336448391006035894, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
       propertyPath: m_Layer
       value: 6
       objectReference: {fileID: 0}
@@ -53590,9 +53598,9 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
-    - targetCorrespondingSourceObject: {fileID: -1123275377152294906, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
+    - targetCorrespondingSourceObject: {fileID: 6234022623702388829, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 368197196}
+      addedObject: {fileID: 321723489}
     - targetCorrespondingSourceObject: {fileID: 5854254303843970301, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
       insertIndex: -1
       addedObject: {fileID: 621507199}
@@ -58011,6 +58019,11 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 1262509237}
   m_SourcePrefab: {fileID: -5645937942226959685, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
+--- !u!4 &1840881165 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6234022623702388829, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
+  m_PrefabInstance: {fileID: 1840881164}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1847510084 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -9132638638502411417, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
@@ -61050,11 +61063,6 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -8544530973899912750, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
---- !u!4 &1992862927 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -1123275377152294906, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}
-  m_PrefabInstance: {fileID: 1840881164}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1994900922 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 2277949325568625834, guid: e58d8c15809a39c499f1f9a370e5db36, type: 3}

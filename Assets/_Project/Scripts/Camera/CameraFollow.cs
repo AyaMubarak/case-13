@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class CameraFollow : MonoBehaviour
@@ -6,9 +6,9 @@ public class CameraFollow : MonoBehaviour
     [Header("Target")]
     public Transform target;
 
-    [Header("Camera Position")]
-    public Vector3 cameraOffset = new Vector3(0f, 1.5f, -2.8f);
-    public float followSpeed = 15f;
+    [Header("Camera Position (FPS)")]
+    public Vector3 cameraOffset = new Vector3(0f, 1.6f, 0.15f); // أمام الوجه قليلاً لتجنب رؤية الرأس من الداخل
+    public float followSpeed = 30f;
 
     [Header("PC Mouse")]
     [Range(0.01f, 0.3f)]
@@ -18,8 +18,8 @@ public class CameraFollow : MonoBehaviour
     public float touchSensitivity = 0.12f;
 
     [Header("Vertical Limits")]
-    public float minPitch = -10f;
-    public float maxPitch = 35f;
+    public float minPitch = -60f;
+    public float maxPitch = 60f;
 
     [Header("Camera Collision")]
     public LayerMask obstacleLayers;
@@ -136,76 +136,16 @@ public class CameraFollow : MonoBehaviour
 
     private void UpdateCamera()
     {
-        Quaternion rotation =
-            Quaternion.Euler(pitch, yaw, 0f);
+        Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
 
-        // نقطة دوران الكاميرا
-        Vector3 pivotPoint =
-            target.position + Vector3.up * 1.3f;
+        // نقطة الرأس بناءً على الـ offset (منظور الشخص الأول)
+        Vector3 desiredPosition = target.position + target.rotation * new Vector3(cameraOffset.x, 0, 0) + Vector3.up * cameraOffset.y + rotation * new Vector3(0, 0, cameraOffset.z);
 
-        // المكان الطبيعي خلف اللاعب
-        Vector3 desiredPosition =
-            pivotPoint +
-            rotation *
-            new Vector3(
-                cameraOffset.x,
-                cameraOffset.y - 1.3f,
-                cameraOffset.z
-            );
-
-        // ==========================================
-        // Camera Collision
-        // ==========================================
-
-        Vector3 direction =
-            desiredPosition - pivotPoint;
-
-        float distance = direction.magnitude;
-
-        if (distance > 0.01f)
-        {
-            direction.Normalize();
-
-            Vector3 rayStart =
-                pivotPoint +
-                direction * playerClearance;
-
-            float rayDistance =
-                Mathf.Max(
-                    0f,
-                    distance - playerClearance
-                );
-
-            if (Physics.SphereCast(
-                rayStart,
-                0.25f,
-                direction,
-                out RaycastHit hit,
-                rayDistance,
-                obstacleLayers,
-                QueryTriggerInteraction.Ignore))
-            {
-                if (!hit.transform.IsChildOf(target))
-                {
-                    desiredPosition =
-                        hit.point +
-                        hit.normal *
-                        collisionOffset;
-                }
-            }
-        }
-
-        // ==========================================
-        // Apply
-        // ==========================================
-
+        // تطبيق الدوران والمكان فوراً (لا نستخدم Lerp بطيء في الـ FPS لتجنب الدوار)
         transform.rotation = rotation;
-
-        transform.position =
-            Vector3.Lerp(
-                transform.position,
-                desiredPosition,
-                followSpeed * Time.deltaTime
-            );
+        transform.position = desiredPosition;
+        
+        // إجبار اللاعب على الدوران ليتطابق مع اتجاه نظر الكاميرا يميناً ويساراً (لكي يراه الآخرون بشكل صحيح)
+        target.rotation = Quaternion.Euler(0f, yaw, 0f);
     }
 }

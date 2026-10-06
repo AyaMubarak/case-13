@@ -1,9 +1,11 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class EvidenceManager : MonoBehaviour
 {
     public static EvidenceManager Instance { get; private set; }
+
+    public static event System.Action OnAllEvidenceCollected;
 
     [Header("Case Settings")]
     public int totalEvidence = 5;
@@ -74,6 +76,8 @@ public class EvidenceManager : MonoBehaviour
         {
             UIManager.Instance.ShowOnScreenNotification("ALL EVIDENCE COLLECTED // PROCEED TO DEDUCTION");
         }
+
+        OnAllEvidenceCollected?.Invoke();
     }
 
     public List<Evidence> GetCollectedEvidence()
