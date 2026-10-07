@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1001 &4605241826873567519
+--- !u!1001 &8790328936364916759
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -8,57 +8,90 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: -8679921383154817045, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - target: {fileID: -8679921383154817045, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - target: {fileID: -8679921383154817045, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.6
+      value: 1
       objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - target: {fileID: -8679921383154817045, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
       propertyPath: m_LocalPosition.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - target: {fileID: -8679921383154817045, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
       propertyPath: m_LocalRotation.w
       value: 1
       objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - target: {fileID: -8679921383154817045, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
       propertyPath: m_LocalRotation.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - target: {fileID: -8679921383154817045, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
       propertyPath: m_LocalRotation.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - target: {fileID: -8679921383154817045, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - target: {fileID: -8679921383154817045, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - target: {fileID: -8679921383154817045, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - target: {fileID: -8679921383154817045, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 919132149155446097, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - target: {fileID: -7219772299731422950, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.0005482836
+      objectReference: {fileID: 0}
+    - target: {fileID: -7219772299731422950, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0.025415635
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
       propertyPath: m_Name
       value: NPC_NoraBlake
       objectReference: {fileID: 0}
-    - target: {fileID: 5866666021909216657, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - target: {fileID: 5866666021909216657, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
       propertyPath: m_Controller
       value: 
       objectReference: {fileID: 9100000, guid: 5f30c0396b30d5e419a8603226c32835, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects:
-    - {fileID: -8700617353114198275, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    - {fileID: -8700617353114198275, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
     m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 04486d0ef435a3b468395759614d632a, type: 3}
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6886451413222400452}
+  m_SourcePrefab: {fileID: 100100000, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
+--- !u!1 &8447886802719833414 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 7f5b6a6a244218e4abce52e015948262, type: 3}
+  m_PrefabInstance: {fileID: 8790328936364916759}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &6886451413222400452
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8447886802719833414}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 57530c5b6e8261a49a7e86eb0ed8d3ad, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SuspectInterrogation
+  suspectName: Nora Blake
+  suspectPortrait: {fileID: 2039676205718866816, guid: c67f5c6b70dd35948b52d7cc9ac5753d, type: 3}
+  initialAlibi: I saw someone carrying a small sealed box toward the rear exit. They were wearing a dark jacket!
+  brokenAlibiResponse: Alright, alright! My keycard log doesn't lie... I entered the office at 02:15, but I didn't pull the trigger!
+  promptMessage: Press [E] to Interrogate Suspect

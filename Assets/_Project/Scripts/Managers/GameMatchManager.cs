@@ -23,7 +23,10 @@ public class GameMatchManager : NetworkBehaviour
         remainingTime = totalMatchTime;
 
         if (suspectManager != null)
-            suspectManager.SetSuspectCount(LobbyManager.InitialSuspects);
+        {
+            // Hide suspects initially. SeparateInterrogationManager will handle showing them one by one.
+            suspectManager.SetSuspectCount(0);
+        }
     }
 
     private void Update()

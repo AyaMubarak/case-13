@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 public class CharacterVisualSelector : MonoBehaviour
 {
@@ -99,6 +99,21 @@ public class CharacterVisualSelector : MonoBehaviour
         {
             if (femaleDetective != null) femaleDetective.SetActive(true);
             else if (maleDetective != null) maleDetective.SetActive(true);
+        }
+
+        // If this is the local player, hide the meshes but keep shadows
+        var networkPlayer = GetComponent<NetworkPlayerController>();
+        if (networkPlayer != null && networkPlayer.IsOwner)
+        {
+            GameObject activeModel = model != null ? model : (femaleDetective != null ? femaleDetective : maleDetective);
+            if (activeModel != null)
+            {
+                Renderer[] renderers = activeModel.GetComponentsInChildren<Renderer>(true);
+                foreach (var r in renderers)
+                {
+                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+                }
+            }
         }
     }
 }

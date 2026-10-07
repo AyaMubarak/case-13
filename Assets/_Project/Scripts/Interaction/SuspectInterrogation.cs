@@ -51,16 +51,23 @@ public class SuspectInterrogation : MonoBehaviour, IInteractable
             InterrogationManager.Instance.RecordOrUpdateStatement(suspectName, isAlibiBroken ? brokenAlibiResponse : initialAlibi, suspectPortrait);
         }
 
-        // 2. بدلاً من فتح النافذة فوراً، نكتفي بإظهار إشعار وحفظ المتهم الأخير
+        // 2. إخبار مدير المشهد أن المتهم يجب أن يبدأ حركته نحو الكرسي
+        var cutsceneManager = FindAnyObjectByType<SeparateInterrogationManager>();
+        if (cutsceneManager != null)
+        {
+            cutsceneManager.StartSuspectMovement(suspectName);
+        }
+
+        // 3. إظهار إشعار حفظ الأقوال
         InterrogationUI.lastInterrogatedSuspect = this;
         
         if (UIManager.Instance != null)
         {
-            UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED // PRESS [B] TO VIEW DOSSIER");
+            UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED // SUSPECT IS MOVING");
         }
         else
         {
-            Debug.Log("STATEMENT RECORDED // PRESS [B] TO VIEW DOSSIER");
+            Debug.Log("STATEMENT RECORDED // SUSPECT IS MOVING");
         }
     }
 

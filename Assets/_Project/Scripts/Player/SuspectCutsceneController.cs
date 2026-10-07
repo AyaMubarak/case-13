@@ -15,6 +15,11 @@ public class SeparateInterrogationManager : MonoBehaviour
         [HideInInspector] public NavMeshAgent agent;
         [HideInInspector] public Animator animator;
         [HideInInspector] public bool hasReached = false;
+        [HideInInspector] public Vector3 initialPosition;
+        [HideInInspector] public bool isLeaving = false;
+        [HideInInspector] public bool hasLeft = false;
+        [HideInInspector] public bool isWaitingForInteraction = false;
+        [HideInInspector] public float actionTime = 0f;
     }
 
     [Header("المتهم الأول (مثلاً Evan)")]
@@ -37,8 +42,10 @@ public class SeparateInterrogationManager : MonoBehaviour
         InitializeSuspect(suspect2);
 
         // إغلاق جميع الكاميرات والمتهمين في البداية حتى يتم جمع الأدلة
-        if (suspect1.suspectCamera != null) suspect1.suspectCamera.gameObject.SetActive(false);
-        if (suspect2.suspectCamera != null) suspect2.suspectCamera.gameObject.SetActive(false);
+        if (suspect1.suspectCamera != null && suspect1.suspectCamera != Camera.main) 
+            suspect1.suspectCamera.gameObject.SetActive(false);
+        if (suspect2.suspectCamera != null && suspect2.suspectCamera != Camera.main) 
+            suspect2.suspectCamera.gameObject.SetActive(false);
         if (suspect1.suspectObject != null) suspect1.suspectObject.gameObject.SetActive(false);
         if (suspect2.suspectObject != null) suspect2.suspectObject.gameObject.SetActive(false);
 
@@ -56,6 +63,9 @@ public class SeparateInterrogationManager : MonoBehaviour
             suspect.agent = suspect.suspectObject.GetComponent<NavMeshAgent>();
             suspect.animator = suspect.suspectObject.GetComponent<Animator>();
 
+            // حفظ مكان الباب أو المكان الابتدائي ليعود إليه لاحقاً
+            suspect.initialPosition = suspect.suspectObject.position;
+
             // التأكد من أن المتهم مغلق وغير متحرك في البداية
             if (suspect.agent != null)
             {
@@ -69,26 +79,49 @@ public class SeparateInterrogationManager : MonoBehaviour
     {
         Debug.Log("[INTERROGATION] All evidence collected - Suspects are arriving!");
         
-        // إظهار المتهمين الآن
-        if (suspect1.suspectObject != null) suspect1.suspectObject.gameObject.SetActive(true);
-        if (suspect2.suspectObject != null) suspect2.suspectObject.gameObject.SetActive(true);
-
         playerSetupComplete = true;
 
         if (!suspectsStarted)
         {
             suspectsStarted = true;
-            // بدء دخول المتهم الأول فقط بعد اكتمال اختيار اللاعب
+            // بدء دخول المتهم الأول فقط
             StartSuspectTurn(suspect1);
         }
     }
 
     void StartSuspectTurn(SuspectData suspect)
     {
-        if (suspect.agent != null && suspect.chairTarget != null)
+        if (suspect.suspectObject != null)
         {
-            suspect.agent.enabled = true;
-            suspect.agent.SetDestination(suspect.chairTarget.position);
+            // إظهار هذا المتهم فقط
+            suspect.suspectObject.gameObject.SetActive(true);
+        }
+
+        // الانتظار حتى يتفاعل المحقق
+        suspect.isWaitingForInteraction = true;
+    }
+
+    public void StartSuspectMovement(string nameOfSuspect)
+    {
+        if (currentSuspectTurn == 1 && suspect1.suspectName == nameOfSuspect && suspect1.isWaitingForInteraction)
+        {
+            suspect1.isWaitingForInteraction = false;
+            suspect1.actionTime = Time.time;
+            if (suspect1.agent != null && suspect1.chairTarget != null)
+            {
+                suspect1.agent.enabled = true;
+                suspect1.agent.SetDestination(suspect1.chairTarget.position);
+            }
+        }
+        else if (currentSuspectTurn == 2 && suspect2.suspectName == nameOfSuspect && suspect2.isWaitingForInteraction)
+        {
+            suspect2.isWaitingForInteraction = false;
+            suspect2.actionTime = Time.time;
+            if (suspect2.agent != null && suspect2.chairTarget != null)
+            {
+                suspect2.agent.enabled = true;
+                suspect2.agent.SetDestination(suspect2.chairTarget.position);
+            }
         }
     }
 
@@ -99,19 +132,58 @@ public class SeparateInterrogationManager : MonoBehaviour
             return;
 
         // --- متابعة دور المتهم الأول ---
-        if (currentSuspectTurn == 1 && !suspect1.hasReached)
+        if (currentSuspectTurn == 1)
         {
-            CheckSuspectArrival(suspect1, 1);
+            if (!suspect1.isWaitingForInteraction && !suspect1.hasReached)
+                CheckSuspectArrival(suspect1, 1);
+            else if (suspect1.isLeaving && !suspect1.hasLeft)
+                CheckSuspectLeaving(suspect1, 1);
         }
         // --- متابعة دور المتهم الثاني ---
-        else if (currentSuspectTurn == 2 && !suspect2.hasReached)
+        else if (currentSuspectTurn == 2)
         {
-            CheckSuspectArrival(suspect2, 2);
+            if (!suspect2.isWaitingForInteraction && !suspect2.hasReached)
+                CheckSuspectArrival(suspect2, 2);
+            else if (suspect2.isLeaving && !suspect2.hasLeft)
+                CheckSuspectLeaving(suspect2, 2);
+        }
+    }
+
+    void CheckSuspectLeaving(SuspectData suspect, int suspectIndex)
+    {
+        if (Time.time - suspect.actionTime < 0.5f) return; // انتظار قليل لتجنب الوصول الفوري
+
+        if (suspect.agent != null && !suspect.agent.pathPending)
+        {
+            if (suspect.agent.remainingDistance <= suspect.agent.stoppingDistance)
+            {
+                suspect.hasLeft = true;
+                suspect.agent.isStopped = true;
+                suspect.agent.enabled = false;
+                
+                if (suspect.animator != null)
+                {
+                    suspect.animator.SetTrigger("Idle"); // أو يمكنك استخدام متغير آخر لوقوفه بثبات
+                }
+
+                if (suspect.suspectObject != null)
+                {
+                    suspect.suspectObject.gameObject.SetActive(false); // يخفي نفسه بعد أن يصل للباب
+                }
+
+                // تلقائياً ينتقل للمتهم الثاني إذا كان هذا المتهم الأول
+                if (suspectIndex == 1)
+                {
+                    NextSuspect();
+                }
+            }
         }
     }
 
     void CheckSuspectArrival(SuspectData suspect, int suspectIndex)
     {
+        if (Time.time - suspect.actionTime < 0.5f) return; // انتظار قليل لتجنب الوصول الفوري
+
         if (suspect.agent != null && !suspect.agent.pathPending)
         {
             if (suspect.agent.remainingDistance <= suspect.agent.stoppingDistance)
@@ -133,19 +205,21 @@ public class SeparateInterrogationManager : MonoBehaviour
 
     public void ActivateSuspectCamera(int suspectIndex)
     {
-        // إيقاف كل الكاميرات أولاً
-        if (suspect1.suspectCamera != null) suspect1.suspectCamera.gameObject.SetActive(false);
-        if (suspect2.suspectCamera != null) suspect2.suspectCamera.gameObject.SetActive(false);
+        // إيقاف كل الكاميرات أولاً (ما عدا الكاميرا الأساسية)
+        if (suspect1.suspectCamera != null && suspect1.suspectCamera != Camera.main) 
+            suspect1.suspectCamera.gameObject.SetActive(false);
+        if (suspect2.suspectCamera != null && suspect2.suspectCamera != Camera.main) 
+            suspect2.suspectCamera.gameObject.SetActive(false);
 
         // تفعيل كاميرا المتهم المطلوب
         SuspectData targetSuspect = (suspectIndex == 1) ? suspect1 : suspect2;
         if (targetSuspect.suspectCamera != null) targetSuspect.suspectCamera.gameObject.SetActive(true);
 
         // بدء تسلسل الحوار
-        StartCoroutine(PlayDialogueSequence(targetSuspect));
+        StartCoroutine(PlayDialogueSequence(targetSuspect, suspectIndex));
     }
 
-    private System.Collections.IEnumerator PlayDialogueSequence(SuspectData suspect)
+    private System.Collections.IEnumerator PlayDialogueSequence(SuspectData suspect, int suspectIndex)
     {
         // 1. تشغيل صوت المحقق أولاً بناءً على الجنس
         AudioSource detectiveVoice = GetDetectiveVoice();
@@ -156,10 +230,32 @@ public class SeparateInterrogationManager : MonoBehaviour
         }
 
         // 2. تشغيل صوت المتهم بعد الانتهاء
-        if (suspect.suspectVoiceAudio != null)
+        if (suspect.suspectVoiceAudio != null && suspect.suspectVoiceAudio.clip != null)
         {
             suspect.suspectVoiceAudio.Play();
+            yield return new WaitForSeconds(suspect.suspectVoiceAudio.clip.length + 0.5f);
         }
+        else
+        {
+            yield return new WaitForSeconds(3f); // انتظار افتراضي لو مفيش صوت
+        }
+
+        // 3. المشي للباب
+        MakeSuspectLeave(suspect);
+    }
+
+    private void MakeSuspectLeave(SuspectData suspect)
+    {
+        if (suspect.animator != null)
+        {
+            suspect.animator.SetTrigger("StandUp"); // تأكد أن لديك Trigger بهذا الاسم في الـ Animator
+        }
+
+        suspect.agent.enabled = true;
+        suspect.agent.isStopped = false;
+        suspect.agent.SetDestination(suspect.initialPosition);
+        suspect.isLeaving = true;
+        suspect.actionTime = Time.time;
     }
 
     private AudioSource GetDetectiveVoice()
@@ -176,6 +272,12 @@ public class SeparateInterrogationManager : MonoBehaviour
     // دالة للانتقال اليدوي للدور التالي (مثلاً عند الضغط على زر أو انتهاء الحوار)
     public void NextSuspect()
     {
+        // إخفاء المتهم الأول عند بدء دور المتهم الثاني
+        if (suspect1.suspectObject != null)
+        {
+            suspect1.suspectObject.gameObject.SetActive(false);
+        }
+
         currentSuspectTurn = 2;
         StartSuspectTurn(suspect2);
     }
