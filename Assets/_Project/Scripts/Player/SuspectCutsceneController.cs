@@ -11,7 +11,12 @@ public class SeparateInterrogationManager : MonoBehaviour
         public Transform suspectObject;
         public Transform chairTarget;
         public Camera suspectCamera;
-        public AudioSource suspectVoiceAudio; // الصوت الخاص بالمتهم
+        
+        [Header("Dialogues (حوارات هذا المتهم)")]
+        public AudioSource detectiveAskMale;   // صوت المحقق (الذكر) وهو يسأل هذا المتهم
+        public AudioSource detectiveAskFemale; // صوت المحققة (الأنثى) وهي تسأل هذا المتهم
+        public AudioSource suspectVoiceAudio;  // الصوت الخاص بالمتهم وهو يرد
+
         [HideInInspector] public NavMeshAgent agent;
         [HideInInspector] public Animator animator;
         [HideInInspector] public bool hasReached = false;
@@ -28,26 +33,26 @@ public class SeparateInterrogationManager : MonoBehaviour
     [Header("المتهم الثاني (مثلاً Nora)")]
     public SuspectData suspect2;
 
-    [Header("أصوات المحقق (حسب الجنس)")]
-    public AudioSource detectiveAudioMale;   // صوت المحقق (ذكر)
-    public AudioSource detectiveAudioFemale; // صوت المحقق (أنثى)
-
     private int currentSuspectTurn = 1; // 1 = دور المتهم الأول, 2 = دور المتهم الثاني
     private bool playerSetupComplete = false; // يتم تعيينها بعد انتهاء اختيار اللاعب
     private bool suspectsStarted = false; // تتبع ما إذا كنا قد بدأنا الحركة
+
+    void Awake()
+    {
+        // إغلاق الكاميرات والمتهمين فوراً في Awake لمنع تشغيل أي أنيميشن بالبداية
+        if (suspect1.suspectCamera != null && suspect1.suspectCamera != Camera.main) 
+            suspect1.suspectCamera.gameObject.SetActive(false);
+        if (suspect2.suspectCamera != null && suspect2.suspectCamera != Camera.main) 
+            suspect2.suspectCamera.gameObject.SetActive(false);
+        
+        if (suspect1.suspectObject != null) suspect1.suspectObject.gameObject.SetActive(false);
+        if (suspect2.suspectObject != null) suspect2.suspectObject.gameObject.SetActive(false);
+    }
 
     void Start()
     {
         InitializeSuspect(suspect1);
         InitializeSuspect(suspect2);
-
-        // إغلاق جميع الكاميرات والمتهمين في البداية حتى يتم جمع الأدلة
-        if (suspect1.suspectCamera != null && suspect1.suspectCamera != Camera.main) 
-            suspect1.suspectCamera.gameObject.SetActive(false);
-        if (suspect2.suspectCamera != null && suspect2.suspectCamera != Camera.main) 
-            suspect2.suspectCamera.gameObject.SetActive(false);
-        if (suspect1.suspectObject != null) suspect1.suspectObject.gameObject.SetActive(false);
-        if (suspect2.suspectObject != null) suspect2.suspectObject.gameObject.SetActive(false);
 
         // الاستماع لحدث جمع كل الأدلة (لا يدخلون إلا بعد جمعها)
         EvidenceManager.OnAllEvidenceCollected += OnAllEvidenceCollected;
@@ -93,11 +98,11 @@ public class SeparateInterrogationManager : MonoBehaviour
     {
         if (suspect.suspectObject != null)
         {
-            // إظهار هذا المتهم فقط
+            // إظهار هذا المتهم فقط (سيظهر عند الباب)
             suspect.suspectObject.gameObject.SetActive(true);
         }
 
-        // الانتظار حتى يتفاعل المحقق
+        // الانتظار حتى يتفاعل المحقق (يضغط E لسماع أقواله)
         suspect.isWaitingForInteraction = true;
     }
 
@@ -221,8 +226,8 @@ public class SeparateInterrogationManager : MonoBehaviour
 
     private System.Collections.IEnumerator PlayDialogueSequence(SuspectData suspect, int suspectIndex)
     {
-        // 1. تشغيل صوت المحقق أولاً بناءً على الجنس
-        AudioSource detectiveVoice = GetDetectiveVoice();
+        // 1. تشغيل صوت المحقق أولاً بناءً على الجنس الخاص بهذا المتهم
+        AudioSource detectiveVoice = GetDetectiveVoice(suspect);
         if (detectiveVoice != null && detectiveVoice.clip != null)
         {
             detectiveVoice.Play();
@@ -258,15 +263,15 @@ public class SeparateInterrogationManager : MonoBehaviour
         suspect.actionTime = Time.time;
     }
 
-    private AudioSource GetDetectiveVoice()
+    private AudioSource GetDetectiveVoice(SuspectData suspect)
     {
-        // جلب صوت المحقق المناسب حسب الجنس المختار
+        // جلب صوت المحقق المناسب لهذا المتهم حسب الجنس المختار للاعب
         if (PlayerProfile.LocalPlayer != null)
         {
-            if (PlayerProfile.LocalPlayer.gender == DetectiveGender.Male) return detectiveAudioMale;
-            else return detectiveAudioFemale;
+            if (PlayerProfile.LocalPlayer.gender == DetectiveGender.Male) return suspect.detectiveAskMale;
+            else return suspect.detectiveAskFemale;
         }
-        return detectiveAudioMale; // افتراضي
+        return suspect.detectiveAskMale; // افتراضي
     }
 
     // دالة للانتقال اليدوي للدور التالي (مثلاً عند الضغط على زر أو انتهاء الحوار)

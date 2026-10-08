@@ -63,7 +63,7 @@ public class SuspectInterrogation : MonoBehaviour, IInteractable
         
         if (UIManager.Instance != null)
         {
-            UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED // SUSPECT IS MOVING");
+            UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED // PRESS [B] TO VIEW DOSSIER");
         }
         else
         {
