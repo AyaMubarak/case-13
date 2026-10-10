@@ -22,11 +22,13 @@ public class PlayerSetupUI : MonoBehaviour
             return;
         }
 
+        /*
         if (LobbyManager.Instance == null)
         {
             Debug.LogError("LobbyManager not found");
             return;
         }
+        */
 
         string playerName = playerNameInput.text;
         string gender = genderDropdown.options[genderDropdown.value].text;
@@ -47,6 +49,8 @@ public class PlayerSetupUI : MonoBehaviour
         ulong clientId = rpcParams.Receive.SenderClientId;
         PlayerRole role = (PlayerRole)roleIndex;
 
+        // Obsolete Netcode Logic
+        /*
         bool success = LobbyManager.Instance.TryAssignPlayer(clientId, playerName, gender, role);
 
         if (success)
@@ -55,6 +59,7 @@ public class PlayerSetupUI : MonoBehaviour
             ReplyAcceptedClientRpc(profile.ClientId, profile.PlayerName, profile.Gender, (int)profile.Role);
         }
         else
+        */
         {
             ReplyRejectedClientRpc(clientId, "Name or role is already taken.");
         }

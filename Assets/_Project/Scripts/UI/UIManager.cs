@@ -34,6 +34,18 @@ public class UIManager : MonoBehaviour
     public TextMeshProUGUI detailTypeText;
     public TextMeshProUGUI detailDescriptionText;
 
+    [Header("End Game Screen (Case Closed)")]
+    public GameObject endGamePanel;
+    public TextMeshProUGUI timeTakenText;
+    public TextMeshProUGUI evidenceScoreText;
+    public TextMeshProUGUI finalGradeText;
+
+    [Header("Settings Screen")]
+    public GameObject settingsPanel;
+
+    private float gameStartTime;
+    private bool isGameActive = true;
+
     private bool isInventoryOpen = false;
     private Coroutine notificationCoroutine;
 
@@ -76,6 +88,12 @@ public class UIManager : MonoBehaviour
         {
             evidenceCounterText.transform.parent.gameObject.SetActive(false);
         }
+
+        gameStartTime = Time.time;
+        isGameActive = true;
+
+        if (endGamePanel != null) endGamePanel.SetActive(false);
+        if (settingsPanel != null) settingsPanel.SetActive(false);
 
         if (mobileControls != null)
         {
@@ -120,6 +138,8 @@ public class UIManager : MonoBehaviour
     // فتح وإغلاق ملف التحقيق الصحيح
     public void ToggleInterrogationDossier()
     {
+        if (!isGameActive) return; // منع الفتح إذا انتهت اللعبة
+
         // إغلاق الحقيبة إن كانت مفتوحة لمنع التداخل
         if (isInventoryOpen)
         {
@@ -156,6 +176,8 @@ public class UIManager : MonoBehaviour
 
     public void ToggleInventory()
     {
+        if (!isGameActive) return; // منع الفتح إذا انتهت اللعبة
+
         // إغلاق ملف التحقيق إن كان مفتوحاً لمنع التداخل
         if (InterrogationUI.Instance != null && InterrogationUI.Instance.interrogationPanel != null && InterrogationUI.Instance.interrogationPanel.activeSelf)
         {
@@ -359,6 +381,65 @@ public class UIManager : MonoBehaviour
         if (notificationBannerText.transform.parent != null)
         {
             notificationBannerText.transform.parent.gameObject.SetActive(false);
+        }
+    }
+
+    public void ShowEndGameScreen()
+    {
+        isGameActive = false;
+        
+        // إخفاء الـ HUD المعتاد
+        if (inGameHUD != null) inGameHUD.SetActive(false);
+        SetMobileControlsActive(false);
+
+        // إظهار لوحة النهاية
+        if (endGamePanel != null) endGamePanel.SetActive(true);
+
+        // إظهار الماوس
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        // حساب الوقت والنقاط
+        float timeSpent = Time.time - gameStartTime;
+        int minutes = Mathf.FloorToInt(timeSpent / 60);
+        int seconds = Mathf.FloorToInt(timeSpent % 60);
+        
+        if (timeTakenText != null) timeTakenText.text = $"TIME TAKEN: {minutes:00}:{seconds:00}";
+
+        int evCount = EvidenceManager.Instance != null ? EvidenceManager.Instance.CollectedCount : 0;
+        if (evidenceScoreText != null) evidenceScoreText.text = $"EVIDENCE: {evCount} / 5";
+
+        // تحديد التقييم
+        if (finalGradeText != null)
+        {
+            if (evCount == 5 && timeSpent < 300) finalGradeText.text = "RANK: S (MASTER DETECTIVE)";
+            else if (evCount >= 3) finalGradeText.text = "RANK: A (GREAT WORK)";
+            else finalGradeText.text = "RANK: B (CASE CLOSED)";
+        }
+    }
+
+    public void ReturnToMainMenu()
+    {
+        // سنقوم بتحميل مشهد القائمة الرئيسية لاحقاً (مثلاً المشهد رقم 0)
+        UnityEngine.SceneManagement.SceneManager.LoadScene(0);
+    }
+
+    public void ToggleSettings()
+    {
+        if (settingsPanel == null) return;
+        
+        bool isOpen = !settingsPanel.activeSelf;
+        settingsPanel.SetActive(isOpen);
+        
+        if (isOpen)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+        else if (isGameActive && !isInventoryOpen) // العودة لوضع اللعب إذا كانت اللعبة مستمرة
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
     }
 }

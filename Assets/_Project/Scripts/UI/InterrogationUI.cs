@@ -208,8 +208,12 @@ public class InterrogationUI : MonoBehaviour
 
             if (UIManager.Instance != null)
             {
-                UIManager.Instance.ShowOnScreenNotification("ALIBI SHATTERED // NEW LEAD UNLOCKED");
+                UIManager.Instance.ShowOnScreenNotification("ALIBI SHATTERED // CASE SOLVED!");
+                UIManager.Instance.ShowEndGameScreen();
             }
+            
+            // إغلاق لوحة التحقيق بعد المواجهة الناجحة
+            CloseInterrogation();
         }
         else
         {
