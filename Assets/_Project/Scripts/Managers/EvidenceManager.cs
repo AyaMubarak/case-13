@@ -10,6 +10,15 @@ public class EvidenceManager : MonoBehaviour
     [Header("Case Settings")]
     public int totalEvidence = 5;
 
+    [Header("Audio Settings")]
+    public AudioSource allEvidenceCollectedVoice; // كائن الصوت: "all-evidence-collected"
+
+    [Header("Suspects Management")]
+    [Tooltip("اسحبي كائن المتهم الأول هنا ليظهر عند الباب")]
+    public GameObject firstSuspect;
+    [Tooltip("اسحبي كائن المتهم الثاني هنا لنتأكد من بقائه مطفأ حتى يأتي دوره")]
+    public GameObject secondSuspect;
+
     private List<Evidence> collectedEvidenceList = new List<Evidence>();
     private bool isCaseComplete = false;
 
@@ -24,6 +33,27 @@ public class EvidenceManager : MonoBehaviour
             return;
         }
         Instance = this;
+
+        // إيقاف التشغيل التلقائي وضبط إعدادات الصوت احتياطياً
+        if (allEvidenceCollectedVoice != null)
+        {
+            allEvidenceCollectedVoice.playOnAwake = false;
+            allEvidenceCollectedVoice.loop = false;
+            allEvidenceCollectedVoice.spatialBlend = 0f; // ليكون الصوت 2D ومسموعاً في كل الغرفة
+            allEvidenceCollectedVoice.volume = 1f;
+            allEvidenceCollectedVoice.Stop();
+        }
+
+        // التأكد من أن المتهمين معطلان تماماً في بداية اللعبة
+        if (firstSuspect != null)
+        {
+            firstSuspect.SetActive(false);
+        }
+
+        if (secondSuspect != null)
+        {
+            secondSuspect.SetActive(false);
+        }
     }
 
     private void Start()
@@ -77,6 +107,25 @@ public class EvidenceManager : MonoBehaviour
             UIManager.Instance.ShowOnScreenNotification("ALL EVIDENCE COLLECTED // PROCEED TO DEDUCTION");
         }
 
+        // تشغيل صوت اكتمال الأدلة
+        if (allEvidenceCollectedVoice != null)
+        {
+            allEvidenceCollectedVoice.gameObject.SetActive(true);
+            allEvidenceCollectedVoice.enabled = true;
+            if (!allEvidenceCollectedVoice.isPlaying)
+            {
+                allEvidenceCollectedVoice.Play();
+            }
+        }
+
+        // تفعيل المتهم الأول فوراً ليظهر عند الباب ويبدأ التحقيق معه
+        if (firstSuspect != null)
+        {
+            firstSuspect.SetActive(true);
+            Debug.Log("<color=yellow>[INTERROGATION]</color> First suspect activated at the door!");
+        }
+
+        // إطلاق الحدث العام لأي سكربتات أخرى تستمع إليه
         OnAllEvidenceCollected?.Invoke();
     }
 

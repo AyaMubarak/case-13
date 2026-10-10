@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
-using System;
+using System.Collections;
 
 public class SeparateInterrogationManager : MonoBehaviour
 {
@@ -11,14 +11,22 @@ public class SeparateInterrogationManager : MonoBehaviour
         public Transform suspectObject;
         public Transform chairTarget;
         public Camera suspectCamera;
-        
-        [Header("Dialogues (حوارات هذا المتهم)")]
-        public AudioSource detectiveAskMale;   // صوت المحقق (الذكر) وهو يسأل هذا المتهم
-        public AudioSource detectiveAskFemale; // صوت المحققة (الأنثى) وهي تسأل هذا المتهم
-        public AudioSource suspectVoiceAudio;  // الصوت الخاص بالمتهم وهو يرد
+        public Sprite suspectPortrait;
+
+        [Header("Detective Voices for THIS Suspect")]
+        public AudioSource detectiveAskMale;
+        public AudioSource detectiveAskFemale;
+
+        [Header("Suspect Response")]
+        public AudioSource suspectVoiceAudio;
+
+        [Header("Dialogue Text")]
+        public string detectiveDialogueText = "Please tell us what happened.";
+        public string suspectDialogueText = "I have nothing to say!";
 
         [HideInInspector] public NavMeshAgent agent;
         [HideInInspector] public Animator animator;
+        [HideInInspector] public Collider suspectCollider;
         [HideInInspector] public bool hasReached = false;
         [HideInInspector] public Vector3 initialPosition;
         [HideInInspector] public bool isLeaving = false;
@@ -27,26 +35,40 @@ public class SeparateInterrogationManager : MonoBehaviour
         [HideInInspector] public float actionTime = 0f;
     }
 
-    [Header("المتهم الأول (مثلاً Evan)")]
+    [Header("المتهم الأول (Evan)")]
     public SuspectData suspect1;
 
-    [Header("المتهم الثاني (مثلاً Nora)")]
+    [Header("المتهم الثاني (Nora)")]
     public SuspectData suspect2;
 
-    private int currentSuspectTurn = 1; // 1 = دور المتهم الأول, 2 = دور المتهم الثاني
-    private bool playerSetupComplete = false; // يتم تعيينها بعد انتهاء اختيار اللاعب
-    private bool suspectsStarted = false; // تتبع ما إذا كنا قد بدأنا الحركة
+    // الإحداثيات الدقيقة للكرسي
+    private readonly Vector3 chairSeatPosition = new Vector3(2.01f, 0.02f, -7.73f);
+    private readonly Quaternion chairSeatRotation = Quaternion.Euler(0f, 146.4f, 0f);
+
+    private int currentSuspectTurn = 1;
+    private bool playerSetupComplete = false;
+    private bool suspectsStarted = false;
+    private bool isInterrogating = false;
 
     void Awake()
     {
-        // إغلاق الكاميرات والمتهمين فوراً في Awake لمنع تشغيل أي أنيميشن بالبداية
+        DisablePlayOnAwake(suspect1);
+        DisablePlayOnAwake(suspect2);
+
         if (suspect1.suspectCamera != null && suspect1.suspectCamera != Camera.main) 
             suspect1.suspectCamera.gameObject.SetActive(false);
         if (suspect2.suspectCamera != null && suspect2.suspectCamera != Camera.main) 
             suspect2.suspectCamera.gameObject.SetActive(false);
-        
+
         if (suspect1.suspectObject != null) suspect1.suspectObject.gameObject.SetActive(false);
         if (suspect2.suspectObject != null) suspect2.suspectObject.gameObject.SetActive(false);
+    }
+
+    private void DisablePlayOnAwake(SuspectData suspect)
+    {
+        if (suspect.detectiveAskMale != null) { suspect.detectiveAskMale.playOnAwake = false; suspect.detectiveAskMale.Stop(); }
+        if (suspect.detectiveAskFemale != null) { suspect.detectiveAskFemale.playOnAwake = false; suspect.detectiveAskFemale.Stop(); }
+        if (suspect.suspectVoiceAudio != null) { suspect.suspectVoiceAudio.playOnAwake = false; suspect.suspectVoiceAudio.Stop(); }
     }
 
     void Start()
@@ -54,11 +76,8 @@ public class SeparateInterrogationManager : MonoBehaviour
         InitializeSuspect(suspect1);
         InitializeSuspect(suspect2);
 
-        // الاستماع لحدث جمع كل الأدلة (لا يدخلون إلا بعد جمعها)
-        EvidenceManager.OnAllEvidenceCollected += OnAllEvidenceCollected;
-
-        // إذا كنت تستخدم event مختلف، قم بتعديل هذا السطر
-        // مثلاً: PlayerProfile.LocalPlayer.OnProfileChanged += OnPlayerSetupCompleted;
+        // إظهار المتهمين فوراً بدلاً من انتظار الأدلة
+        StartCoroutine(StartSuspectsEarly());
     }
 
     void InitializeSuspect(SuspectData suspect)
@@ -66,12 +85,15 @@ public class SeparateInterrogationManager : MonoBehaviour
         if (suspect.suspectObject != null)
         {
             suspect.agent = suspect.suspectObject.GetComponent<NavMeshAgent>();
-            suspect.animator = suspect.suspectObject.GetComponent<Animator>();
-
-            // حفظ مكان الباب أو المكان الابتدائي ليعود إليه لاحقاً
+            suspect.animator = suspect.suspectObject.GetComponentInChildren<Animator>();
+            suspect.suspectCollider = suspect.suspectObject.GetComponent<Collider>();
             suspect.initialPosition = suspect.suspectObject.position;
 
-            // التأكد من أن المتهم مغلق وغير متحرك في البداية
+            if (suspect.animator != null)
+            {
+                suspect.animator.applyRootMotion = false;
+            }
+
             if (suspect.agent != null)
             {
                 suspect.agent.enabled = false;
@@ -79,17 +101,16 @@ public class SeparateInterrogationManager : MonoBehaviour
         }
     }
 
-    // يتم استدعاء هذه الدالة عندما يجمع اللاعب كل الأدلة
-    public void OnAllEvidenceCollected()
+    private IEnumerator StartSuspectsEarly()
     {
-        Debug.Log("[INTERROGATION] All evidence collected - Suspects are arriving!");
-        
+        // تأخير بسيط جداً لضمان تحميل جميع العناصر
+        yield return new WaitForSeconds(0.5f);
+
         playerSetupComplete = true;
 
         if (!suspectsStarted)
         {
             suspectsStarted = true;
-            // بدء دخول المتهم الأول فقط
             StartSuspectTurn(suspect1);
         }
     }
@@ -98,186 +119,243 @@ public class SeparateInterrogationManager : MonoBehaviour
     {
         if (suspect.suspectObject != null)
         {
-            // إظهار هذا المتهم فقط (سيظهر عند الباب)
             suspect.suspectObject.gameObject.SetActive(true);
         }
-
-        // الانتظار حتى يتفاعل المحقق (يضغط E لسماع أقواله)
         suspect.isWaitingForInteraction = true;
     }
 
-    public void StartSuspectMovement(string nameOfSuspect)
+    public void StartInterrogationSequence()
     {
-        if (currentSuspectTurn == 1 && suspect1.suspectName == nameOfSuspect && suspect1.isWaitingForInteraction)
+        if (isInterrogating) return;
+
+        SuspectData target = (currentSuspectTurn == 1) ? suspect1 : suspect2;
+
+        if (target.isWaitingForInteraction)
         {
-            suspect1.isWaitingForInteraction = false;
-            suspect1.actionTime = Time.time;
-            if (suspect1.agent != null && suspect1.chairTarget != null)
+            isInterrogating = true;
+            target.isWaitingForInteraction = false;
+            target.actionTime = Time.time;
+
+            if (target.agent != null)
             {
-                suspect1.agent.enabled = true;
-                suspect1.agent.SetDestination(suspect1.chairTarget.position);
-            }
-        }
-        else if (currentSuspectTurn == 2 && suspect2.suspectName == nameOfSuspect && suspect2.isWaitingForInteraction)
-        {
-            suspect2.isWaitingForInteraction = false;
-            suspect2.actionTime = Time.time;
-            if (suspect2.agent != null && suspect2.chairTarget != null)
-            {
-                suspect2.agent.enabled = true;
-                suspect2.agent.SetDestination(suspect2.chairTarget.position);
+                target.agent.enabled = true;
+                target.agent.isStopped = false;
+                target.agent.SetDestination(chairSeatPosition);
+
+                if (target.animator != null)
+                {
+                    target.animator.SetBool("isWalking", true);
+                    target.animator.SetFloat("Speed", 1.5f);
+                    target.animator.SetFloat("Velocity", 1.5f);
+                }
             }
         }
     }
 
     void Update()
     {
-        // لا تفعل أي حركة للمتهمين إذا لم ينته اللاعب من الاختيار
-        if (!playerSetupComplete)
-            return;
+        if (!playerSetupComplete) return;
 
-        // --- متابعة دور المتهم الأول ---
         if (currentSuspectTurn == 1)
         {
             if (!suspect1.isWaitingForInteraction && !suspect1.hasReached)
                 CheckSuspectArrival(suspect1, 1);
-            else if (suspect1.isLeaving && !suspect1.hasLeft)
-                CheckSuspectLeaving(suspect1, 1);
         }
-        // --- متابعة دور المتهم الثاني ---
         else if (currentSuspectTurn == 2)
         {
             if (!suspect2.isWaitingForInteraction && !suspect2.hasReached)
                 CheckSuspectArrival(suspect2, 2);
-            else if (suspect2.isLeaving && !suspect2.hasLeft)
-                CheckSuspectLeaving(suspect2, 2);
-        }
-    }
-
-    void CheckSuspectLeaving(SuspectData suspect, int suspectIndex)
-    {
-        if (Time.time - suspect.actionTime < 0.5f) return; // انتظار قليل لتجنب الوصول الفوري
-
-        if (suspect.agent != null && !suspect.agent.pathPending)
-        {
-            if (suspect.agent.remainingDistance <= suspect.agent.stoppingDistance)
-            {
-                suspect.hasLeft = true;
-                suspect.agent.isStopped = true;
-                suspect.agent.enabled = false;
-                
-                if (suspect.animator != null)
-                {
-                    suspect.animator.SetTrigger("Idle"); // أو يمكنك استخدام متغير آخر لوقوفه بثبات
-                }
-
-                if (suspect.suspectObject != null)
-                {
-                    suspect.suspectObject.gameObject.SetActive(false); // يخفي نفسه بعد أن يصل للباب
-                }
-
-                // تلقائياً ينتقل للمتهم الثاني إذا كان هذا المتهم الأول
-                if (suspectIndex == 1)
-                {
-                    NextSuspect();
-                }
-            }
         }
     }
 
     void CheckSuspectArrival(SuspectData suspect, int suspectIndex)
     {
-        if (Time.time - suspect.actionTime < 0.5f) return; // انتظار قليل لتجنب الوصول الفوري
+        if (Time.time - suspect.actionTime < 0.5f) return;
 
-        if (suspect.agent != null && !suspect.agent.pathPending)
+        bool hasArrived = false;
+        
+        if (suspect.agent != null && suspect.suspectObject != null)
         {
-            if (suspect.agent.remainingDistance <= suspect.agent.stoppingDistance)
+            float distance = Vector3.Distance(suspect.suspectObject.position, chairSeatPosition);
+            if (!suspect.agent.pathPending)
             {
-                suspect.hasReached = true;
-                suspect.agent.isStopped = true;
-                suspect.agent.enabled = false; // استقرار بالجلوس
+                if ((suspect.agent.hasPath && suspect.agent.remainingDistance <= suspect.agent.stoppingDistance + 0.25f) || distance < 1.0f)
+                {
+                    hasArrived = true;
+                }
+            }
+        }
+        else if (suspect.suspectObject != null)
+        {
+            // Fallback if agent is missing
+            float distance = Vector3.Distance(suspect.suspectObject.position, chairSeatPosition);
+            if (distance < 1.0f) hasArrived = true;
+        }
 
+        // حماية إضافية: إذا علق المتهم لأكثر من 6 ثوانٍ، اجبره على الوصول للكرسي!
+        if (Time.time - suspect.actionTime > 6.0f)
+        {
+            hasArrived = true;
+        }
+
+        if (hasArrived)
+        {
+            suspect.hasReached = true;
+            if (suspect.agent != null)
+            {
+                suspect.agent.isStopped = true;
+                suspect.agent.enabled = false;
+            }
+
+            if (suspect.suspectCollider != null)
+            {
+                suspect.suspectCollider.enabled = false;
+            }
+
+                // تثبيت مكان الجلوس والدوران
+                suspect.suspectObject.position = chairSeatPosition;
+                suspect.suspectObject.rotation = chairSeatRotation;
+
+                // تحويل الحركة إلى جلوس صامت (mixamo.com)
                 if (suspect.animator != null)
                 {
+                    suspect.animator.SetBool("isWalking", false);
+                    suspect.animator.SetFloat("Speed", 0f);
+                    suspect.animator.SetFloat("Velocity", 0f);
                     suspect.animator.SetTrigger("ReachChair");
                 }
 
-                // تفعيل الكاميرا الخاصة بهذا المتهم وحده وتشكيل مشهده
                 ActivateSuspectCamera(suspectIndex);
+                StartCoroutine(PlayDialogueSequence(suspect));
             }
         }
-    }
 
     public void ActivateSuspectCamera(int suspectIndex)
     {
-        // إيقاف كل الكاميرات أولاً (ما عدا الكاميرا الأساسية)
         if (suspect1.suspectCamera != null && suspect1.suspectCamera != Camera.main) 
             suspect1.suspectCamera.gameObject.SetActive(false);
         if (suspect2.suspectCamera != null && suspect2.suspectCamera != Camera.main) 
             suspect2.suspectCamera.gameObject.SetActive(false);
 
-        // تفعيل كاميرا المتهم المطلوب
         SuspectData targetSuspect = (suspectIndex == 1) ? suspect1 : suspect2;
         if (targetSuspect.suspectCamera != null) targetSuspect.suspectCamera.gameObject.SetActive(true);
-
-        // بدء تسلسل الحوار
-        StartCoroutine(PlayDialogueSequence(targetSuspect, suspectIndex));
     }
 
-    private System.Collections.IEnumerator PlayDialogueSequence(SuspectData suspect, int suspectIndex)
+    private IEnumerator PlayDialogueSequence(SuspectData suspect)
     {
-        // 1. تشغيل صوت المحقق أولاً بناءً على الجنس الخاص بهذا المتهم
-        AudioSource detectiveVoice = GetDetectiveVoice(suspect);
-        if (detectiveVoice != null && detectiveVoice.clip != null)
+        // تثبيت إضافي للجلوس لضمان عدم حدوث إزاحة من أي كليب
+        suspect.suspectObject.position = chairSeatPosition;
+        suspect.suspectObject.rotation = chairSeatRotation;
+
+        // 1. المحقق يتكلم (المتهم جالس يستمع فقط بدون كلام)
+        AudioSource detectiveVoice = (PlayerProfile.LocalPlayer != null && PlayerProfile.LocalPlayer.gender == DetectiveGender.Female)
+            ? suspect.detectiveAskFemale
+            : (suspect.detectiveAskMale != null ? suspect.detectiveAskMale : suspect.detectiveAskFemale);
+
+        string detText = !string.IsNullOrEmpty(suspect.detectiveDialogueText) ? suspect.detectiveDialogueText : "Please tell us what happened.";
+        float detectiveDuration = (detectiveVoice != null && detectiveVoice.clip != null) ? detectiveVoice.clip.length + 0.5f : 6.0f;
+        
+        if (UIManager.Instance != null)
         {
-            detectiveVoice.Play();
-            yield return new WaitForSeconds(detectiveVoice.clip.length + 0.5f); // انتظار حتى ينتهي الصوت مع نصف ثانية إضافية
+            UIManager.Instance.ShowOnScreenNotification($"[DETECTIVE]: {detText}", detectiveDuration);
         }
 
-        // 2. تشغيل صوت المتهم بعد الانتهاء
-        if (suspect.suspectVoiceAudio != null && suspect.suspectVoiceAudio.clip != null)
+        if (detectiveVoice != null && detectiveVoice.clip != null)
         {
-            suspect.suspectVoiceAudio.Play();
-            yield return new WaitForSeconds(suspect.suspectVoiceAudio.clip.length + 0.5f);
+            detectiveVoice.gameObject.SetActive(true);
+            detectiveVoice.enabled = true;
+            detectiveVoice.spatialBlend = 0f;
+            detectiveVoice.volume = 1f;
+            detectiveVoice.Play();
+            yield return new WaitForSeconds(detectiveVoice.clip.length + 0.3f);
         }
         else
         {
-            yield return new WaitForSeconds(3f); // انتظار افتراضي لو مفيش صوت
+            yield return new WaitForSeconds(3f);
         }
 
-        // 3. المشي للباب
+        // 2. انتهاء كلام المحقق -> المتهم يبدأ بالكلام والحركة معاً
+        if (suspect.animator != null)
+        {
+            suspect.animator.ResetTrigger("StopTalking");
+            suspect.animator.SetTrigger("StartTalking");
+        }
+
+        string susName = !string.IsNullOrEmpty(suspect.suspectName) ? suspect.suspectName.ToUpper() : "SUSPECT";
+        string susText = !string.IsNullOrEmpty(suspect.suspectDialogueText) ? suspect.suspectDialogueText : "I have nothing to say!";
+        float suspectDuration = (suspect.suspectVoiceAudio != null && suspect.suspectVoiceAudio.clip != null) ? suspect.suspectVoiceAudio.clip.length + 0.5f : 6.0f;
+        
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.ShowOnScreenNotification($"[{susName}]: {susText}", suspectDuration);
+        }
+
+        if (suspect.suspectVoiceAudio != null && suspect.suspectVoiceAudio.clip != null)
+        {
+            suspect.suspectVoiceAudio.gameObject.SetActive(true);
+            suspect.suspectVoiceAudio.enabled = true;
+            suspect.suspectVoiceAudio.spatialBlend = 0f;
+            suspect.suspectVoiceAudio.volume = 1f;
+            suspect.suspectVoiceAudio.Play();
+            yield return new WaitForSeconds(suspect.suspectVoiceAudio.clip.length);
+        }
+        else
+        {
+            yield return new WaitForSeconds(3.5f);
+        }
+
+        // 3. انتهاء رد المتهم -> العودة للجلوس الصامت مباشرة
+        if (suspect.animator != null)
+        {
+            suspect.animator.ResetTrigger("StartTalking");
+            suspect.animator.SetTrigger("StopTalking");
+        }
+
+        yield return new WaitForSeconds(0.5f);
+
+        // 4. حفظ الإفادة والتنبيه
+        if (InterrogationUI.Instance != null)
+        {
+            InterrogationUI.Instance.SetInterrogationRecord(suspect.suspectName, suspect.suspectDialogueText, suspect.suspectPortrait);
+        }
+
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.UnlockDossierAccess();
+            
+            if (Application.isMobilePlatform || SystemInfo.deviceType == DeviceType.Handheld || UIManager.Instance.forceMobileUIInEditor)
+            {
+                UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED! TAP [FILES] TO REVIEW CASE");
+            }
+            else
+            {
+                UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED! PRESS [B] TO REVIEW CASE FILES");
+            }
+        }
+
+        yield return new WaitForSeconds(3.0f);
+
+        // الانتقال للمتهم التالي
         MakeSuspectLeave(suspect);
     }
 
-    private void MakeSuspectLeave(SuspectData suspect)
+    private void MakeSuspectLeave(SuspectData currentSuspect)
     {
-        if (suspect.animator != null)
+        if (currentSuspect.suspectObject != null)
         {
-            suspect.animator.SetTrigger("StandUp"); // تأكد أن لديك Trigger بهذا الاسم في الـ Animator
+            currentSuspect.suspectObject.gameObject.SetActive(false);
         }
 
-        suspect.agent.enabled = true;
-        suspect.agent.isStopped = false;
-        suspect.agent.SetDestination(suspect.initialPosition);
-        suspect.isLeaving = true;
-        suspect.actionTime = Time.time;
-    }
-
-    private AudioSource GetDetectiveVoice(SuspectData suspect)
-    {
-        // جلب صوت المحقق المناسب لهذا المتهم حسب الجنس المختار للاعب
-        if (PlayerProfile.LocalPlayer != null)
+        if (currentSuspectTurn == 1)
         {
-            if (PlayerProfile.LocalPlayer.gender == DetectiveGender.Male) return suspect.detectiveAskMale;
-            else return suspect.detectiveAskFemale;
+            NextSuspect();
         }
-        return suspect.detectiveAskMale; // افتراضي
     }
 
-    // دالة للانتقال اليدوي للدور التالي (مثلاً عند الضغط على زر أو انتهاء الحوار)
     public void NextSuspect()
     {
-        // إخفاء المتهم الأول عند بدء دور المتهم الثاني
+        isInterrogating = false;
+
         if (suspect1.suspectObject != null)
         {
             suspect1.suspectObject.gameObject.SetActive(false);
@@ -287,9 +365,9 @@ public class SeparateInterrogationManager : MonoBehaviour
         StartSuspectTurn(suspect2);
     }
 
-    private void OnDestroy()
+    // تم إزالة OnDestroy لأنه لم يعد هناك اشتراك في Events
+    public void StartSuspectMovement(string nameOfSuspect)
     {
-        // فك الربط عند الحذف
-        EvidenceManager.OnAllEvidenceCollected -= OnAllEvidenceCollected;
+        StartInterrogationSequence();
     }
 }

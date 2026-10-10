@@ -55,6 +55,13 @@ public class RoleSelectionUI : MonoBehaviour
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+
+        // إخفاء واجهة اللعب وأزرار الموبايل أثناء اختيار الشخصية
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.SetMobileControlsActive(false);
+            if (UIManager.Instance.inGameHUD != null) UIManager.Instance.inGameHUD.SetActive(false);
+        }
     }
 
     public void SetGender(DetectiveGender gender)
@@ -127,6 +134,10 @@ public class RoleSelectionUI : MonoBehaviour
         if (UIManager.Instance != null)
         {
             UIManager.Instance.ShowOnScreenNotification($"DEPLOYED AS // {selectedRole.ToString().ToUpper()}");
+            
+            // إظهار واجهة اللعب وأزرار الموبايل بعد الانتهاء من الاختيار
+            UIManager.Instance.SetMobileControlsActive(true);
+            if (UIManager.Instance.inGameHUD != null) UIManager.Instance.inGameHUD.SetActive(true);
         }
 
         // 3. إخفاء لوحة اختيار الدور فقط، مع إبقاء الـ Canvas الرئيسي مفعلاً لظهور عناصر الـ HUD ورسالة [E]

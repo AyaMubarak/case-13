@@ -41,7 +41,7 @@ public class PlayerSetupUI : MonoBehaviour
         SendRoleSelectionServerRpc(playerName, gender, (int)role);
     }
 
-    [ServerRpc(RequireOwnership = false)]
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
     private void SendRoleSelectionServerRpc(string playerName, string gender, int roleIndex, ServerRpcParams rpcParams = default)
     {
         ulong clientId = rpcParams.Receive.SenderClientId;

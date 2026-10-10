@@ -5,6 +5,7 @@ using TMPro;
 public class InterrogationUI : MonoBehaviour
 {
     public static InterrogationUI Instance { get; private set; }
+    public static SuspectInterrogation lastInterrogatedSuspect;
 
     [Header("UI Panels")]
     public GameObject interrogationPanel;
@@ -23,8 +24,11 @@ public class InterrogationUI : MonoBehaviour
     public Transform contentParent;
     public GameObject statementCardPrefab;
 
-    private SuspectInterrogation currentSuspect;
-    public static SuspectInterrogation lastInterrogatedSuspect;
+    // تخزين بيانات المتهم المستجوب
+    private string savedSuspectName = "";
+    private string savedStatement = "";
+    private Sprite savedPortrait = null;
+    private bool hasRecordedStatement = false;
 
     private void Awake()
     {
@@ -55,29 +59,44 @@ public class InterrogationUI : MonoBehaviour
 
     private void Update()
     {
-        // فتح اللوحة عند الضغط على B إذا كان هناك متهم محفوظ
-        if (Input.GetKeyDown(KeyCode.B) && lastInterrogatedSuspect != null)
+        // فتح وإغلاق اللوحة عند الضغط على B
+        if (Input.GetKeyDown(KeyCode.B))
         {
-            // لا تفتح إذا كانت مفتوحة مسبقاً
-            if (interrogationPanel != null && !interrogationPanel.activeSelf)
+            if (interrogationPanel != null)
             {
-                OpenInterrogation(lastInterrogatedSuspect);
+                if (interrogationPanel.activeSelf)
+                {
+                    CloseInterrogation();
+                }
+                else
+                {
+                    OpenRecordedInterrogation();
+                }
             }
         }
     }
 
-    public void OpenInterrogation(SuspectInterrogation suspect)
+    // دالة لاستقبال بيانات المتهم وتخزينها عند انتهاء التحقيق
+    public void SetInterrogationRecord(string suspectName, string statement, Sprite portrait = null)
     {
-        currentSuspect = suspect;
+        savedSuspectName = suspectName;
+        savedStatement = statement;
+        savedPortrait = portrait;
+        hasRecordedStatement = true;
 
-        if (interrogationPanel != null)
-        {
-            interrogationPanel.SetActive(true);
-        }
+        // تحديث النصوص مسبقاً
+        UpdateUIFields(savedSuspectName, savedStatement, savedPortrait);
+    }
 
-        // تشغيل صوت فتح الملف (Dossier / Paper Flip)
+    public void OpenRecordedInterrogation()
+    {
+        if (interrogationPanel == null) return;
+
+        interrogationPanel.SetActive(true);
+
+        // تشغيل صوت فتح الملف إن وجد
         AudioClip openClip = Resources.Load<AudioClip>("Audio/dragon-studio-flipping-book-page-499646");
-        if (openClip != null)
+        if (openClip != null && Camera.main != null)
         {
             AudioSource.PlayClipAtPoint(openClip, Camera.main.transform.position);
         }
@@ -90,35 +109,49 @@ public class InterrogationUI : MonoBehaviour
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
+        if (hasRecordedStatement)
+        {
+            UpdateUIFields(savedSuspectName, savedStatement, savedPortrait);
+        }
+        else
+        {
+            if (suspectNameText != null) suspectNameText.text = "// SUSPECT DOSSIER: NO DATA";
+            if (dialogueStatementText != null) dialogueStatementText.text = "No interrogation recorded yet. Complete the questioning first.";
+            if (statusFeedbackText != null) statusFeedbackText.text = "STATUS: PENDING INTERROGATION";
+        }
+
+        RefreshDetectiveBoard();
+    }
+
+    private void UpdateUIFields(string name, string statement, Sprite portrait)
+    {
         if (suspectNameText != null)
         {
-            suspectNameText.text = $"// SUSPECT DOSSIER: {suspect.suspectName.ToUpper()}";
+            suspectNameText.text = $"// SUSPECT DOSSIER: {name.ToUpper()}";
         }
 
         if (dialogueStatementText != null)
         {
-            dialogueStatementText.text = suspect.isAlibiBroken ? suspect.brokenAlibiResponse : suspect.initialAlibi;
+            dialogueStatementText.text = statement;
         }
 
         if (statusFeedbackText != null)
         {
-            statusFeedbackText.text = suspect.isAlibiBroken ? "<color=green>[CONTRADICTION CONFIRMED: ALIBI BROKEN]</color>" : "STATUS: UNVERIFIED CLAIM";
+            statusFeedbackText.text = "<color=green>[STATEMENT LOGGED]</color>";
         }
 
         if (suspectPortraitImage != null)
         {
-            if (suspect.suspectPortrait != null)
+            if (portrait != null)
             {
                 suspectPortraitImage.gameObject.SetActive(true);
-                suspectPortraitImage.sprite = suspect.suspectPortrait;
+                suspectPortraitImage.sprite = portrait;
             }
             else
             {
                 suspectPortraitImage.gameObject.SetActive(false);
             }
         }
-
-        RefreshDetectiveBoard();
     }
 
     public void RefreshDetectiveBoard()
@@ -160,22 +193,12 @@ public class InterrogationUI : MonoBehaviour
 
     public void ConfrontSuspect()
     {
-        if (currentSuspect == null) return;
-
         if (EvidenceManager.Instance != null && EvidenceManager.Instance.CollectedCount >= 2)
         {
-            currentSuspect.BreakAlibi();
-
-            // تشغيل صوت النجاح عند كسر العذر
             AudioClip successClip = Resources.Load<AudioClip>("Audio/meldix-success-340660");
-            if (successClip != null)
+            if (successClip != null && Camera.main != null)
             {
                 AudioSource.PlayClipAtPoint(successClip, Camera.main.transform.position);
-            }
-
-            if (dialogueStatementText != null)
-            {
-                dialogueStatementText.text = currentSuspect.brokenAlibiResponse;
             }
 
             if (statusFeedbackText != null)
@@ -190,9 +213,8 @@ public class InterrogationUI : MonoBehaviour
         }
         else
         {
-            // تشغيل صوت الخطأ عند نقص الأدلة
             AudioClip errorClip = Resources.Load<AudioClip>("Audio/u_xg7ssi08yr-error-tone-10-363618");
-            if (errorClip != null)
+            if (errorClip != null && Camera.main != null)
             {
                 AudioSource.PlayClipAtPoint(errorClip, Camera.main.transform.position);
             }

@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -19,14 +19,15 @@ public class UIManager : MonoBehaviour
     [Header("Mobile References")]
     public GameObject mobileControls;         // مجسم أزرار الموبايل
     public GameObject mobileInventoryBtn;    // زر الحقيبة BAG
+    public GameObject mobileDossierBtn;      // زر ملفات التحقيق (بديل حرف B)
 
     [Header("Evidence Inventory Panel")]
     public GameObject inventoryPanel;
     public Transform evidenceListContainer;
     public GameObject evidenceItemUIPrefab;
 
-    [Header("Detective Board Panel")]
-    public GameObject interrogationBoardPanel; // لوحة التحقيق الكبيرة (تفتح بزر B)
+    [Header("Detective Board Panel (لوحة الاستجواب أو الملاحظات)")]
+    public GameObject interrogationBoardPanel; // لوحة التحقيق القديمة إن رغبتِ باستخدامها مستقبلاً
 
     [Header("Evidence Detail View")]
     public TextMeshProUGUI detailNameText;
@@ -34,12 +35,18 @@ public class UIManager : MonoBehaviour
     public TextMeshProUGUI detailDescriptionText;
 
     private bool isInventoryOpen = false;
-    private bool isBoardOpen = false;
     private Coroutine notificationCoroutine;
+
+    [Header("Mobile Testing")]
+    public bool forceMobileUIInEditor = true; // ضع عليها صح في الـ Inspector لاختبار الجوال
 
     private bool IsTouchDevice()
     {
-        return Application.isMobilePlatform && !Application.isEditor;
+#if UNITY_EDITOR
+        return forceMobileUIInEditor;
+#else
+        return Application.isMobilePlatform || SystemInfo.deviceType == DeviceType.Handheld;
+#endif
     }
 
     private void Awake()
@@ -79,6 +86,11 @@ public class UIManager : MonoBehaviour
         {
             mobileInventoryBtn.SetActive(false);
         }
+
+        if (mobileDossierBtn != null)
+        {
+            mobileDossierBtn.SetActive(false);
+        }
     }
 
     private void Update()
@@ -88,21 +100,72 @@ public class UIManager : MonoBehaviour
         {
             if (EvidenceManager.Instance != null && EvidenceManager.Instance.GetCollectedEvidence().Count > 0)
             {
-                if (isBoardOpen) ToggleDetectiveBoard();
+                // إغلاق لوحة الاستجواب إن كانت مفتوحة
+                if (InterrogationUI.Instance != null && InterrogationUI.Instance.interrogationPanel != null && InterrogationUI.Instance.interrogationPanel.activeSelf)
+                {
+                    InterrogationUI.Instance.CloseInterrogation();
+                }
                 ToggleInventory();
             }
         }
 
-        // زر B لوحة التحقيق
+        // زر B لوحة ملفات واستجواب المتهم (Interrogation Panel)
         if (Keyboard.current != null && Keyboard.current.bKey.wasPressedThisFrame)
         {
             if (isInventoryOpen) ToggleInventory();
+            ToggleInterrogationDossier();
+        }
+    }
+
+    // فتح وإغلاق ملف التحقيق الصحيح
+    public void ToggleInterrogationDossier()
+    {
+        // إغلاق الحقيبة إن كانت مفتوحة لمنع التداخل
+        if (isInventoryOpen)
+        {
+            isInventoryOpen = false;
+            if (inventoryPanel != null) inventoryPanel.SetActive(false);
+        }
+
+        if (InterrogationUI.Instance != null && InterrogationUI.Instance.interrogationPanel != null)
+        {
+            bool isCurrentlyOpen = InterrogationUI.Instance.interrogationPanel.activeSelf;
+            if (isCurrentlyOpen)
+            {
+                InterrogationUI.Instance.CloseInterrogation();
+                if (inGameHUD != null) inGameHUD.SetActive(true);
+            }
+            else
+            {
+                InterrogationUI.Instance.OpenRecordedInterrogation();
+                if (inGameHUD != null) inGameHUD.SetActive(false);
+            }
+        }
+        else
+        {
+            // في حال عدم وجود InterrogationUI يعود احتياطياً للوحة القديمة
             ToggleDetectiveBoard();
         }
     }
 
+    // دالة لاستدعائها من زر الموبايل لفتح/إغلاق ملف التحقيق
+    public void OnMobileDossierButtonClicked()
+    {
+        ToggleInterrogationDossier();
+    }
+
     public void ToggleInventory()
     {
+        // إغلاق ملف التحقيق إن كان مفتوحاً لمنع التداخل
+        if (InterrogationUI.Instance != null && InterrogationUI.Instance.interrogationPanel != null && InterrogationUI.Instance.interrogationPanel.activeSelf)
+        {
+            InterrogationUI.Instance.CloseInterrogation();
+        }
+        else if (interrogationBoardPanel != null && interrogationBoardPanel.activeSelf)
+        {
+            interrogationBoardPanel.SetActive(false);
+        }
+
         isInventoryOpen = !isInventoryOpen;
 
         if (inventoryPanel != null) inventoryPanel.SetActive(isInventoryOpen);
@@ -111,11 +174,6 @@ public class UIManager : MonoBehaviour
         if (evidenceCounterText != null && evidenceCounterText.transform.parent != null)
         {
             evidenceCounterText.transform.parent.gameObject.SetActive(!isInventoryOpen);
-        }
-
-        if (mobileControls != null && IsTouchDevice())
-        {
-            mobileControls.SetActive(!isInventoryOpen);
         }
 
         if (isInventoryOpen)
@@ -135,29 +193,13 @@ public class UIManager : MonoBehaviour
     {
         if (interrogationBoardPanel == null) return;
 
-        isBoardOpen = !isBoardOpen;
+        bool isBoardOpen = !interrogationBoardPanel.activeSelf;
         interrogationBoardPanel.SetActive(isBoardOpen);
 
-        // إخفاء الـ HUD بالكامل عند فتح لوحة التحقيق
         if (inGameHUD != null) inGameHUD.SetActive(!isBoardOpen);
-
-        if (evidenceCounterText != null && evidenceCounterText.transform.parent != null)
-        {
-            evidenceCounterText.transform.parent.gameObject.SetActive(!isBoardOpen);
-        }
-
-        if (mobileControls != null && IsTouchDevice())
-        {
-            mobileControls.SetActive(!isBoardOpen);
-        }
 
         if (isBoardOpen)
         {
-            if (InterrogationUI.Instance != null)
-            {
-                InterrogationUI.Instance.RefreshDetectiveBoard();
-            }
-
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }
@@ -187,6 +229,22 @@ public class UIManager : MonoBehaviour
         else
         {
             ShowOnScreenNotification("NEW CLUE ADDED // PRESS [TAB] TO INSPECT");
+        }
+    }
+
+    public void UnlockDossierAccess()
+    {
+        if (mobileDossierBtn != null && IsTouchDevice())
+        {
+            mobileDossierBtn.SetActive(true);
+        }
+    }
+
+    public void SetMobileControlsActive(bool isActive)
+    {
+        if (mobileControls != null && IsTouchDevice())
+        {
+            mobileControls.SetActive(isActive);
         }
     }
 
@@ -237,7 +295,6 @@ public class UIManager : MonoBehaviour
 
     public void ShowInteractionPrompt(string message)
     {
-        // إذا كانت نافذة الاستجواب الفردية مفتوحة، امنع ظهور رسالة [E] نهائياً
         if (InterrogationUI.Instance != null && InterrogationUI.Instance.interrogationPanel != null && InterrogationUI.Instance.interrogationPanel.activeSelf)
         {
             return;
@@ -277,7 +334,7 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    public void ShowOnScreenNotification(string message)
+    public void ShowOnScreenNotification(string message, float duration = 5.5f)
     {
         if (notificationBannerText == null) return;
 
@@ -285,10 +342,10 @@ public class UIManager : MonoBehaviour
         {
             StopCoroutine(notificationCoroutine);
         }
-        notificationCoroutine = StartCoroutine(NotificationRoutine(message));
+        notificationCoroutine = StartCoroutine(NotificationRoutine(message, duration));
     }
 
-    private IEnumerator NotificationRoutine(string message)
+    private IEnumerator NotificationRoutine(string message, float duration)
     {
         notificationBannerText.text = message;
 
@@ -297,7 +354,7 @@ public class UIManager : MonoBehaviour
             notificationBannerText.transform.parent.gameObject.SetActive(true);
         }
 
-        yield return new WaitForSeconds(2.5f);
+        yield return new WaitForSeconds(duration);
 
         if (notificationBannerText.transform.parent != null)
         {
