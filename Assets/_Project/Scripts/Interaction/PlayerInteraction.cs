@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
@@ -29,6 +29,12 @@ public class PlayerInteraction : MonoBehaviour
 
     private void Update()
     {
+        if (CaseIntroCutscene.IsPlaying)
+        {
+            ClearCurrentInteraction();
+            return;
+        }
+
         // فحص الأجسام التفاعلية المحيطة باللاعب مع دعم Triggers
         Collider[] hitColliders = Physics.OverlapSphere(transform.position, interactionRadius, ~0, QueryTriggerInteraction.Collide);
         IInteractable closestInteractable = null;

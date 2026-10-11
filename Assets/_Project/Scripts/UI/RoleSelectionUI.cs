@@ -29,8 +29,28 @@ public class RoleSelectionUI : MonoBehaviour
     private DetectiveGender selectedGender = DetectiveGender.Female;
     private DetectiveRole selectedRole = DetectiveRole.ForensicsExpert;
 
+    [Header("Auto Deploy (اللوبي / تيست محلي)")]
+    [Tooltip("ON: skip this panel; deploy the player immediately using the lobby role (or PlayerProfile test override).")]
+    public bool autoDeployFromLobby = true;
+
     private void Start()
     {
+        if (autoDeployFromLobby)
+        {
+            PlayerProfile p = PlayerProfile.LocalPlayer;
+            if (p == null) p = FindAnyObjectByType<PlayerProfile>(FindObjectsInactive.Include);
+
+            if (p != null)
+            {
+                if (!p.useLocalTestOverride) p.LoadFromLobby();
+                selectedGender = p.gender;
+                Debug.Log($"[RoleSelectionUI] Auto deploy: {p.currentRole} / {p.gender}");
+                SelectRoleAndDeploy(p.currentRole);
+                return;
+            }
+            Debug.LogWarning("[RoleSelectionUI] PlayerProfile not found, showing manual panel.");
+        }
+
         // إظهار اللوحة والماوس في بداية المشهد
         OpenPanel();
 
@@ -146,7 +166,18 @@ public class RoleSelectionUI : MonoBehaviour
             selectionPanel.SetActive(false);
         }
 
-        gameObject.SetActive(false);
+        // لا نعطّل هذا الكائن إذا كان يحتوي اللاعب أو الجويستيك أو الكاميرا (كان يكسر الحركة)
+        bool holdsGameplay =
+            GetComponentInChildren<PlayerMovement>(true) != null ||
+            GetComponentInChildren<MobileJoystick>(true) != null ||
+            GetComponentInChildren<CameraFollow>(true) != null ||
+            GetComponent<PlayerProfile>() != null;
+
+        if (!holdsGameplay)
+            gameObject.SetActive(false);
+        else
+            enabled = false;
+
 
         // 4. قفل الماوس للبدء في تحريك الكاميرا والتحقيق
         Cursor.lockState = CursorLockMode.Locked;

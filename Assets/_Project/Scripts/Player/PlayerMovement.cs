@@ -62,8 +62,47 @@ public class PlayerMovement : MonoBehaviour
         playerCollider.enabled = true;
     }
 
+    [Header("Local Test (تيست محلي)")]
+    [Tooltip("ON: moves directly every frame, ignoring the collision cast and network ownership. Guaranteed to move.")]
+    public bool forceSimpleMove = true;
+
     private void Update()
     {
+        if (CaseIntroCutscene.IsPlaying)
+        {
+            moveInput = Vector2.zero;
+            return;
+        }
+
+        ReadInput();
+
+        if (!forceSimpleMove || moveInput.sqrMagnitude < 0.001f)
+            return;
+
+        Vector3 fwd = cam != null ? cam.transform.forward : transform.forward;
+        Vector3 right = cam != null ? cam.transform.right : transform.right;
+        fwd.y = 0f; right.y = 0f;
+        fwd.Normalize(); right.Normalize();
+
+        Vector3 dir = (fwd * moveInput.y + right * moveInput.x).normalized;
+        Vector3 delta = dir * moveSpeed * Time.deltaTime;
+
+        if (rb != null) rb.position += delta;
+        transform.position += delta;
+    }
+
+    private void ReadInput()
+    {
+        if (cam == null)
+        {
+            cam = Camera.main != null ? Camera.main : FindAnyObjectByType<Camera>();
+        }
+
+        if (Keyboard.current == null && mobileJoystick == null)
+        {
+            Debug.LogWarning("PlayerMovement: Keyboard.current is null. Set Project Settings > Player > Active Input Handling to 'Input System Package' or 'Both'.");
+        }
+
         // ==========================================
         // MOBILE JOYSTICK
         // ==========================================
@@ -113,12 +152,18 @@ public class PlayerMovement : MonoBehaviour
         else
         {
             moveInput = Vector2.zero;
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+            float lx = UnityEngine.Input.GetAxisRaw("Horizontal");
+            float ly = UnityEngine.Input.GetAxisRaw("Vertical");
+            moveInput = new Vector2(lx, ly).normalized;
+#endif
         }
     }
 
     private void FixedUpdate()
     {
-        if (rb == null || playerCollider == null)
+        if (forceSimpleMove || rb == null || playerCollider == null)
             return;
 
         if (moveInput.sqrMagnitude < 0.001f)

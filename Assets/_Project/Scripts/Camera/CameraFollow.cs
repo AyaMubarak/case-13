@@ -57,6 +57,9 @@ public class CameraFollow : MonoBehaviour
         if (target == null)
             return;
 
+        if (CaseIntroCutscene.IsPlaying)
+            return;
+
         HandleCameraInput();
         UpdateCamera();
     }
@@ -88,7 +91,9 @@ public class CameraFollow : MonoBehaviour
         {
             var touch = Touchscreen.current.primaryTouch;
 
-            if (touch.press.isPressed)
+            if (touch.press.isPressed &&
+                !(UnityEngine.EventSystems.EventSystem.current != null &&
+                  UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(touch.touchId.ReadValue())))
             {
                 Vector2 delta =
                     touch.delta.ReadValue();
