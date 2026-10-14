@@ -5,8 +5,8 @@ using UnityEngine.UI;
 public class PlayerInteraction : MonoBehaviour
 {
     [Header("Interaction Settings")]
-    [Tooltip("نصف قطر دائرة التفاعل حول اللاعب")]
-    public float interactionRadius = 2.5f;
+    [Tooltip("نصف قطر دائرة التفاعل حول اللاعب (مسافة قريبة ومتوازنة)")]
+    public float interactionRadius = 1.35f;
 
     [Header("Mobile Controls UI")]
     public GameObject mobileInteractBtn;
@@ -15,6 +15,9 @@ public class PlayerInteraction : MonoBehaviour
 
     private void Start()
     {
+        // ضبط مسافة التفاعل إلى مسافة معقولة وقريبة (1.35m) تمنع التفاعل من بعيد وتمنع اختفاء التنبيه السريع
+        interactionRadius = 1.35f;
+
         if (mobileInteractBtn != null)
         {
             Button btn = mobileInteractBtn.GetComponent<Button>();
@@ -29,21 +32,24 @@ public class PlayerInteraction : MonoBehaviour
 
     private void Update()
     {
-        if (CaseIntroCutscene.IsPlaying)
+        if (CaseIntroCutscene.IsPlaying || EvidenceCutsceneManager.IsQuizOrVideoActive)
         {
             ClearCurrentInteraction();
             return;
         }
 
+        // مركز فحص التفاعل يكون عند مستوى صدر/وسط اللاعب لضمان التقاط الأدلة الموضوعة على الطاولات والأرض
+        Vector3 playerCenter = transform.position + Vector3.up * 0.9f;
+
         // فحص الأجسام التفاعلية المحيطة باللاعب مع دعم Triggers
-        Collider[] hitColliders = Physics.OverlapSphere(transform.position, interactionRadius, ~0, QueryTriggerInteraction.Collide);
+        Collider[] hitColliders = Physics.OverlapSphere(playerCenter, interactionRadius, ~0, QueryTriggerInteraction.Collide);
         IInteractable closestInteractable = null;
         float closestDistance = Mathf.Infinity;
 
         foreach (var hitCollider in hitColliders)
         {
-            // تجاهل اللاعب نفسه
-            if (hitCollider.gameObject == gameObject || hitCollider.transform.root == transform)
+            // تجاهل كوليدرات اللاعب نفسه
+            if (hitCollider.gameObject == gameObject || hitCollider.transform.root == transform.root)
                 continue;
 
             IInteractable interactable = hitCollider.GetComponentInParent<IInteractable>();
@@ -54,8 +60,11 @@ public class PlayerInteraction : MonoBehaviour
 
             if (interactable != null)
             {
-                float dist = Vector3.Distance(transform.position, hitCollider.transform.position);
-                if (dist < closestDistance)
+                // حساب أقرب نقطة على سطح كوليدر الدليل بدلاً من الـ Pivot الداخلي
+                Vector3 closestPointOnTarget = hitCollider.ClosestPoint(playerCenter);
+                float dist = Vector3.Distance(playerCenter, closestPointOnTarget);
+
+                if (dist <= interactionRadius && dist < closestDistance)
                 {
                     closestDistance = dist;
                     closestInteractable = interactable;
@@ -66,13 +75,6 @@ public class PlayerInteraction : MonoBehaviour
         if (closestInteractable != null)
         {
             currentInteractable = closestInteractable;
-            // أضيفي هذا السطر هنا لرؤية النتيجة في الـ Console:
-            Debug.Log("<color=green>تم العثور على دليل قريب جداً:</color> " + currentInteractable.InteractionPrompt);
-
-            if (UIManager.Instance != null)
-            {
-                UIManager.Instance.ShowInteractionPrompt(currentInteractable.InteractionPrompt);
-            }
 
             if (UIManager.Instance != null)
             {

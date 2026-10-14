@@ -63,12 +63,17 @@ public class PlayerMovement : MonoBehaviour
     }
 
     [Header("Local Test (تيست محلي)")]
-    [Tooltip("ON: moves directly every frame, ignoring the collision cast and network ownership. Guaranteed to move.")]
+    [Tooltip("ON: moves directly every frame with collision checks. Guaranteed to move.")]
     public bool forceSimpleMove = true;
+
+    [Header("Ground Snap (تثبيت على الأرض)")]
+    public bool snapToGround = true;
+    public float groundCheckDistance = 1.5f;
+    public LayerMask groundLayers = ~0;
 
     private void Update()
     {
-        if (CaseIntroCutscene.IsPlaying)
+        if (CaseIntroCutscene.IsPlaying || EvidenceCutsceneManager.IsQuizOrVideoActive)
         {
             moveInput = Vector2.zero;
             return;
@@ -76,19 +81,67 @@ public class PlayerMovement : MonoBehaviour
 
         ReadInput();
 
-        if (!forceSimpleMove || moveInput.sqrMagnitude < 0.001f)
-            return;
+        if (forceSimpleMove && moveInput.sqrMagnitude >= 0.001f)
+        {
+            Vector3 fwd = cam != null ? cam.transform.forward : transform.forward;
+            Vector3 right = cam != null ? cam.transform.right : transform.right;
+            fwd.y = 0f; right.y = 0f;
+            fwd.Normalize(); right.Normalize();
 
-        Vector3 fwd = cam != null ? cam.transform.forward : transform.forward;
-        Vector3 right = cam != null ? cam.transform.right : transform.right;
-        fwd.y = 0f; right.y = 0f;
-        fwd.Normalize(); right.Normalize();
+            Vector3 dir = (fwd * moveInput.y + right * moveInput.x).normalized;
+            float wantedDistance = moveSpeed * Time.deltaTime;
 
-        Vector3 dir = (fwd * moveInput.y + right * moveInput.x).normalized;
-        Vector3 delta = dir * moveSpeed * Time.deltaTime;
+            // التحقق من الاصطدام مسبقاً لمنع صعود اللاعب على الطاولات والمجسمات أو اختراقها
+            float allowedDistance = GetAllowedMovementDistance(dir, wantedDistance);
 
-        if (rb != null) rb.position += delta;
-        transform.position += delta;
+            if (allowedDistance > 0.0001f)
+            {
+                Vector3 delta = dir * allowedDistance;
+                if (rb != null) rb.position += delta;
+                transform.position += delta;
+            }
+        }
+
+        // تثبيت اللاعب على الأرض مباشرة لمنع الطفو، مع منع تسلقه فوق الأجسام المرتفعة
+        SnapPlayerToFloor();
+    }
+
+    private void SnapPlayerToFloor()
+    {
+        if (!snapToGround || playerCollider == null) return;
+
+        // منشأ الفحص من منتصف اللاعب متجهاً للأسفل
+        Vector3 origin = transform.position + Vector3.up * (playerCollider.height * 0.5f);
+        float castDistance = (playerCollider.height * 0.5f) + groundCheckDistance;
+
+        int mask = groundLayers == 0 ? ~LayerMask.GetMask("Ignore Raycast", "UI") : (int)groundLayers;
+
+        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, castDistance, mask, QueryTriggerInteraction.Ignore))
+        {
+            // تجنب الاصطدام بنفس اللاعب
+            if (hit.collider.transform.root != transform.root)
+            {
+                float targetY = hit.point.y;
+                float diff = targetY - transform.position.y;
+
+                // أقصى ارتفاع مسموح للصعود هو عتبة درجة صغيرة جداً (15 سم)
+                // إذا كان الارتفاع أعلى من ذلك (مثل طاولة أو كرسي أو مكتب)، يمنع الصعود فوقها تماماً
+                float maxStepHeight = 0.15f;
+                if (diff > maxStepHeight)
+                {
+                    return; // جسم مرتفع (طاولة/مكتب/عائق)، لا نصعد فوقه!
+                }
+
+                // إذا كان نزولاً أو استقراراً على الأرضية
+                if (Mathf.Abs(diff) > 0.01f)
+                {
+                    Vector3 groundedPos = transform.position;
+                    groundedPos.y = targetY;
+                    transform.position = groundedPos;
+                    if (rb != null) rb.position = groundedPos;
+                }
+            }
+        }
     }
 
     private void ReadInput()

@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!1 &1557515130757202520
 GameObject:
@@ -99,8 +99,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bd845325c45b1294c9ae22855cbff10b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
-  moveSpeed: 4.5
-  rotationSpeed: 14
+  moveSpeed: 4
+  rotationSpeed: 10
+  inputSensitivity: 0.85
   mobileJoystick: {fileID: 0}
 --- !u!114 &1960080071880642252
 MonoBehaviour:

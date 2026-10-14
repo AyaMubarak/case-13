@@ -10,6 +10,8 @@ public enum DetectiveGender
 public class PlayerProfile : MonoBehaviour
 {
     public static PlayerProfile LocalPlayer { get; private set; }
+    public static PlayerProfile LocalInstance => LocalPlayer;
+    public DetectiveRole CurrentRole => currentRole;
 
     public event Action OnProfileChanged;
 
@@ -99,11 +101,19 @@ public class PlayerProfile : MonoBehaviour
         OnProfileChanged?.Invoke();
     }
 
+#if UNITY_EDITOR
     private void OnValidate()
     {
         if (Application.isPlaying)
         {
-            OnProfileChanged?.Invoke();
+            UnityEditor.EditorApplication.delayCall += () =>
+            {
+                if (this != null)
+                {
+                    OnProfileChanged?.Invoke();
+                }
+            };
         }
     }
+#endif
 }

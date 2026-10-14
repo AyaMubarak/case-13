@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
@@ -33,6 +34,9 @@ public class UIManager : MonoBehaviour
     public TextMeshProUGUI detailNameText;
     public TextMeshProUGUI detailTypeText;
     public TextMeshProUGUI detailDescriptionText;
+    [Header("Evidence Video Replay & Suspect Outcome")]
+    public Button replayEvidenceVideoBtn;
+    public TextMeshProUGUI evidenceEliminatedSuspectText;
 
     [Header("End Game Screen (Case Closed)")]
     public GameObject endGamePanel;
@@ -69,6 +73,26 @@ public class UIManager : MonoBehaviour
             return;
         }
         Instance = this;
+
+        // إغلاق أي لوحات قديمة قد تعترض وتحجب الضغطات (Raycast Blockers) فور الاستيقاظ
+        GameObject uiContainer = GameObject.Find("UI_Container");
+        if (uiContainer != null)
+        {
+            RectTransform containerRt = uiContainer.GetComponent<RectTransform>();
+            if (containerRt != null)
+            {
+                containerRt.anchorMin = Vector2.zero;
+                containerRt.anchorMax = Vector2.one;
+                containerRt.offsetMin = Vector2.zero;
+                containerRt.offsetMax = Vector2.zero;
+            }
+
+            Transform interr = uiContainer.transform.Find("InterrogationPanel");
+            if (interr != null)
+            {
+                interr.gameObject.SetActive(false);
+            }
+        }
     }
 
     private void Start()
@@ -100,14 +124,94 @@ public class UIManager : MonoBehaviour
             mobileControls.SetActive(IsTouchDevice());
         }
 
-        if (mobileInventoryBtn != null)
+        // إصلاح أبعاد حاوية UI_Container تلقائياً لضمان استلام النقرات للأزرار
+        GameObject uiContainer = GameObject.Find("UI_Container");
+        if (uiContainer != null)
         {
-            mobileInventoryBtn.SetActive(false);
+            RectTransform containerRt = uiContainer.GetComponent<RectTransform>();
+            if (containerRt != null)
+            {
+                containerRt.anchorMin = Vector2.zero;
+                containerRt.anchorMax = Vector2.one;
+                containerRt.offsetMin = Vector2.zero;
+                containerRt.offsetMax = Vector2.zero;
+            }
+
+            Transform interr = uiContainer.transform.Find("InterrogationPanel");
+            if (interr != null)
+            {
+                interr.gameObject.SetActive(false);
+            }
         }
 
+        // إخفاء لوحات الكاتسين إذا لم تكن تعمل
+        GameObject cutscenePnl = GameObject.Find("CutscenePanel");
+        if (cutscenePnl != null && !CaseIntroCutscene.IsPlaying)
+        {
+            cutscenePnl.SetActive(false);
+        }
+
+        // البحث التلقائي عن أزرار الجوال إن لم تكن مربوطة في الـ Inspector
+        if (mobileInventoryBtn == null)
+        {
+            var foundInv = GameObject.Find("MobileInventoryBtn");
+            if (foundInv != null) mobileInventoryBtn = foundInv;
+        }
+
+        if (mobileDossierBtn == null)
+        {
+            var foundDos = GameObject.Find("Btn_Dossier_Mobile");
+            if (foundDos != null) mobileDossierBtn = foundDos;
+        }
+
+        // ضبط وتثبيت أزرار الجوال (الحقيبة والملفات) في الزاوية العلوية اليمنى بدقة داخل الشاشة
+        if (mobileInventoryBtn != null)
+        {
+            mobileInventoryBtn.SetActive(IsTouchDevice());
+            mobileInventoryBtn.transform.SetAsLastSibling();
+
+            RectTransform invRt = mobileInventoryBtn.GetComponent<RectTransform>();
+            if (invRt != null)
+            {
+                invRt.anchorMin = new Vector2(1f, 1f);
+                invRt.anchorMax = new Vector2(1f, 1f);
+                invRt.pivot = new Vector2(1f, 1f);
+                invRt.anchoredPosition = new Vector2(-150f, -40f); // داخل الشاشة تماماً بجانب عداد الأدلة
+                invRt.sizeDelta = new Vector2(75f, 75f);
+                invRt.localScale = Vector3.one;
+            }
+
+            Button invBtnComp = mobileInventoryBtn.GetComponent<Button>();
+            if (invBtnComp != null)
+            {
+                invBtnComp.onClick.RemoveAllListeners();
+                invBtnComp.onClick.AddListener(ToggleInventory);
+            }
+        }
+
+        // إظهار زر ملف المتهمين وتفعيله بشكل دائم لمستخدمي الجوال بجانب الحقيبة
         if (mobileDossierBtn != null)
         {
-            mobileDossierBtn.SetActive(false);
+            mobileDossierBtn.SetActive(IsTouchDevice());
+            mobileDossierBtn.transform.SetAsLastSibling();
+
+            RectTransform dosRt = mobileDossierBtn.GetComponent<RectTransform>();
+            if (dosRt != null)
+            {
+                dosRt.anchorMin = new Vector2(1f, 1f);
+                dosRt.anchorMax = new Vector2(1f, 1f);
+                dosRt.pivot = new Vector2(1f, 1f);
+                dosRt.anchoredPosition = new Vector2(-240f, -40f); // بجانب زر الحقيبة مباشرة
+                dosRt.sizeDelta = new Vector2(75f, 75f);
+                dosRt.localScale = Vector3.one;
+            }
+
+            Button dossierBtnComp = mobileDossierBtn.GetComponent<Button>();
+            if (dossierBtnComp != null)
+            {
+                dossierBtnComp.onClick.RemoveAllListeners();
+                dossierBtnComp.onClick.AddListener(OnMobileDossierButtonClicked);
+            }
         }
     }
 
@@ -116,15 +220,7 @@ public class UIManager : MonoBehaviour
         // زر Tab للحقيبة
         if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
         {
-            if (EvidenceManager.Instance != null && EvidenceManager.Instance.GetCollectedEvidence().Count > 0)
-            {
-                // إغلاق لوحة الاستجواب إن كانت مفتوحة
-                if (InterrogationUI.Instance != null && InterrogationUI.Instance.interrogationPanel != null && InterrogationUI.Instance.interrogationPanel.activeSelf)
-                {
-                    InterrogationUI.Instance.CloseInterrogation();
-                }
-                ToggleInventory();
-            }
+            ToggleInventory();
         }
 
         // زر B لوحة ملفات واستجواب المتهم (Interrogation Panel)
@@ -132,6 +228,12 @@ public class UIManager : MonoBehaviour
         {
             if (isInventoryOpen) ToggleInventory();
             ToggleInterrogationDossier();
+        }
+
+        // زر Escape أو P لفتح/إغلاق الإعدادات داخل اللعبة
+        if (Keyboard.current != null && (Keyboard.current.escapeKey.wasPressedThisFrame || Keyboard.current.pKey.wasPressedThisFrame))
+        {
+            ToggleSettings();
         }
     }
 
@@ -145,6 +247,13 @@ public class UIManager : MonoBehaviour
         {
             isInventoryOpen = false;
             if (inventoryPanel != null) inventoryPanel.SetActive(false);
+        }
+
+        // إذا كان نظام DossierManager موجوداً، نفتحه أو نغلقه
+        if (CaseDossierManager.Instance != null)
+        {
+            CaseDossierManager.Instance.ToggleDossier();
+            return;
         }
 
         if (InterrogationUI.Instance != null && InterrogationUI.Instance.interrogationPanel != null)
@@ -171,14 +280,21 @@ public class UIManager : MonoBehaviour
     // دالة لاستدعائها من زر الموبايل لفتح/إغلاق ملف التحقيق
     public void OnMobileDossierButtonClicked()
     {
+        Debug.Log("<color=cyan>[UI] Dossier Button Clicked via Mobile UI!</color>");
         ToggleInterrogationDossier();
     }
 
     public void ToggleInventory()
     {
+        Debug.Log($"<color=cyan>[UI] Bag (Inventory) Button Clicked! Current isOpen: {isInventoryOpen}</color>");
         if (!isGameActive) return; // منع الفتح إذا انتهت اللعبة
 
-        // إغلاق ملف التحقيق إن كان مفتوحاً لمنع التداخل
+        // إغلاق ملف التحقيق أو لوحة المشتبه بهم إن كانت مفتوحة لمنع حجب الشاشة
+        if (CaseDossierManager.Instance != null && CaseDossierManager.Instance.IsDossierOpen)
+        {
+            CaseDossierManager.Instance.CloseDossier();
+        }
+
         if (InterrogationUI.Instance != null && InterrogationUI.Instance.interrogationPanel != null && InterrogationUI.Instance.interrogationPanel.activeSelf)
         {
             InterrogationUI.Instance.CloseInterrogation();
@@ -190,8 +306,40 @@ public class UIManager : MonoBehaviour
 
         isInventoryOpen = !isInventoryOpen;
 
-        if (inventoryPanel != null) inventoryPanel.SetActive(isInventoryOpen);
+        if (inventoryPanel != null)
+        {
+            Canvas rootCanvas = inventoryPanel.GetComponentInParent<Canvas>(true);
+            if (rootCanvas != null && inventoryPanel.transform.parent != rootCanvas.transform)
+            {
+                inventoryPanel.transform.SetParent(rootCanvas.transform, false);
+            }
+
+            // ضمان وجود Canvas فرعي بترتيب رسم عالي جداً لمنع أي حجب
+            Canvas panelCanvas = inventoryPanel.GetComponent<Canvas>();
+            if (panelCanvas == null)
+            {
+                panelCanvas = inventoryPanel.AddComponent<Canvas>();
+            }
+            panelCanvas.overrideSorting = true;
+            panelCanvas.sortingOrder = 999;
+
+            if (inventoryPanel.GetComponent<GraphicRaycaster>() == null)
+            {
+                inventoryPanel.AddComponent<GraphicRaycaster>();
+            }
+
+            inventoryPanel.SetActive(isInventoryOpen);
+            if (isInventoryOpen)
+            {
+                inventoryPanel.transform.SetAsLastSibling();
+                ApplyPolishedInventoryLayout();
+                RefreshEvidenceList();
+            }
+        }
         if (inGameHUD != null) inGameHUD.SetActive(!isInventoryOpen);
+
+        // إخفاء أزرار الجوال (الجويستيك واليد) بالكامل عند فتح الحقيبة
+        SetMobileControlsActive(!isInventoryOpen);
 
         if (evidenceCounterText != null && evidenceCounterText.transform.parent != null)
         {
@@ -200,7 +348,6 @@ public class UIManager : MonoBehaviour
 
         if (isInventoryOpen)
         {
-            RefreshEvidenceList();
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }
@@ -242,6 +389,16 @@ public class UIManager : MonoBehaviour
         if (mobileInventoryBtn != null && IsTouchDevice())
         {
             mobileInventoryBtn.SetActive(true);
+            RectTransform btnRt = mobileInventoryBtn.GetComponent<RectTransform>();
+            if (btnRt != null)
+            {
+                btnRt.anchorMin = new Vector2(1f, 1f);
+                btnRt.anchorMax = new Vector2(1f, 1f);
+                btnRt.pivot = new Vector2(1f, 1f);
+                btnRt.anchoredPosition = new Vector2(-150f, -40f);
+                btnRt.sizeDelta = new Vector2(75f, 75f);
+                btnRt.localScale = Vector3.one;
+            }
         }
 
         if (IsTouchDevice())
@@ -259,14 +416,37 @@ public class UIManager : MonoBehaviour
         if (mobileDossierBtn != null && IsTouchDevice())
         {
             mobileDossierBtn.SetActive(true);
+            RectTransform btnRt = mobileDossierBtn.GetComponent<RectTransform>();
+            if (btnRt != null)
+            {
+                btnRt.anchorMin = new Vector2(1f, 1f);
+                btnRt.anchorMax = new Vector2(1f, 1f);
+                btnRt.pivot = new Vector2(1f, 1f);
+                btnRt.anchoredPosition = new Vector2(-240f, -40f);
+                btnRt.sizeDelta = new Vector2(75f, 75f);
+                btnRt.localScale = Vector3.one;
+            }
         }
     }
 
     public void SetMobileControlsActive(bool isActive)
     {
-        if (mobileControls != null && IsTouchDevice())
+        if (mobileControls == null)
         {
-            mobileControls.SetActive(isActive);
+            mobileControls = GameObject.Find("MobileControls");
+        }
+
+        if (mobileControls != null)
+        {
+            // عند الإخفاء: إخفاء قاطع دائماً بغض النظر عن المنصة
+            if (!isActive)
+            {
+                mobileControls.SetActive(false);
+            }
+            else if (IsTouchDevice())
+            {
+                mobileControls.SetActive(true);
+            }
         }
     }
 
@@ -301,18 +481,278 @@ public class UIManager : MonoBehaviour
         }
     }
 
+    private void ApplyPolishedInventoryLayout()
+    {
+        if (inventoryPanel == null) return;
+
+        // التأكد من أن لوحة الحقيبة تتبع الـ Canvas الأساسي مباشرة لتعلو كافة العناصر وتأخذ أبعاد الشاشة الحقيقية
+        Canvas rootCanvas = inventoryPanel.GetComponentInParent<Canvas>(true);
+        if (rootCanvas != null && inventoryPanel.transform.parent != rootCanvas.transform)
+        {
+            inventoryPanel.transform.SetParent(rootCanvas.transform, false);
+        }
+
+        // 1. إعادة ضبط حجم وموضع لوحة الحقيبة الرئيسية لتغطي الشاشة بنسب متناسقة وأنيقة
+        RectTransform panelRect = inventoryPanel.GetComponent<RectTransform>();
+        if (panelRect != null)
+        {
+            panelRect.localScale = Vector3.one;
+            panelRect.anchorMin = new Vector2(0.04f, 0.05f);
+            panelRect.anchorMax = new Vector2(0.96f, 0.95f);
+            panelRect.offsetMin = Vector2.zero;
+            panelRect.offsetMax = Vector2.zero;
+            panelRect.anchoredPosition = Vector2.zero;
+            panelRect.pivot = new Vector2(0.5f, 0.5f);
+        }
+
+        // 2. خلفية الحقيبة الأساسية بلون داكن فخم مع لمعة كحلية
+        Image panelImg = inventoryPanel.GetComponent<Image>();
+        if (panelImg != null)
+        {
+            panelImg.color = new Color(0.04f, 0.06f, 0.10f, 0.96f);
+        }
+
+        // 3. ضبط شريط العنوان العلوي (HeaderBar)
+        Transform headerBar = inventoryPanel.transform.Find("HeaderBar");
+        if (headerBar != null)
+        {
+            RectTransform headerRect = headerBar.GetComponent<RectTransform>();
+            if (headerRect != null)
+            {
+                headerRect.anchorMin = new Vector2(0f, 1f);
+                headerRect.anchorMax = new Vector2(1f, 1f);
+                headerRect.pivot = new Vector2(0.5f, 1f);
+                headerRect.anchoredPosition = Vector2.zero;
+                headerRect.sizeDelta = new Vector2(0f, 75f);
+            }
+
+            Image headerImg = headerBar.GetComponent<Image>();
+            if (headerImg != null)
+            {
+                headerImg.color = new Color(0.06f, 0.09f, 0.15f, 0.95f);
+            }
+
+            // زر إغلاق الحقيبة داخل شريط العنوان (Close Button)
+            Transform closeBtnTr = headerBar.Find("Btn_CloseInventory");
+            GameObject closeBtnObj = closeBtnTr != null ? closeBtnTr.gameObject : null;
+            if (closeBtnObj == null)
+            {
+                closeBtnObj = new GameObject("Btn_CloseInventory", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+                closeBtnObj.transform.SetParent(headerBar, false);
+            }
+
+            RectTransform closeRt = closeBtnObj.GetComponent<RectTransform>();
+            closeRt.anchorMin = new Vector2(1f, 0.5f);
+            closeRt.anchorMax = new Vector2(1f, 0.5f);
+            closeRt.pivot = new Vector2(1f, 0.5f);
+            closeRt.anchoredPosition = new Vector2(-20f, 0f);
+            closeRt.sizeDelta = new Vector2(45f, 45f);
+
+            Image closeImg = closeBtnObj.GetComponent<Image>();
+            closeImg.color = new Color(0.85f, 0.25f, 0.25f, 0.9f);
+
+            Transform closeTxtTr = closeBtnObj.transform.Find("Text");
+            TextMeshProUGUI closeTxt = closeTxtTr != null ? closeTxtTr.GetComponent<TextMeshProUGUI>() : null;
+            if (closeTxt == null)
+            {
+                GameObject txtObj = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+                txtObj.transform.SetParent(closeBtnObj.transform, false);
+                closeTxt = txtObj.GetComponent<TextMeshProUGUI>();
+            }
+            closeTxt.text = "X";
+            closeTxt.fontSize = 24f;
+            closeTxt.fontStyle = FontStyles.Bold;
+            closeTxt.alignment = TextAlignmentOptions.Center;
+            closeTxt.color = Color.white;
+            RectTransform txtRt = closeTxt.GetComponent<RectTransform>();
+            txtRt.anchorMin = Vector2.zero;
+            txtRt.anchorMax = Vector2.one;
+            txtRt.sizeDelta = Vector2.zero;
+
+            Button closeBtn = closeBtnObj.GetComponent<Button>();
+            closeBtn.onClick.RemoveAllListeners();
+            closeBtn.onClick.AddListener(ToggleInventory);
+
+            Transform titleTr = headerBar.Find("TitleText");
+            if (titleTr != null)
+            {
+                RectTransform titleRect = titleTr.GetComponent<RectTransform>();
+                if (titleRect != null)
+                {
+                    titleRect.anchorMin = new Vector2(0f, 0f);
+                    titleRect.anchorMax = new Vector2(1f, 1f);
+                    titleRect.pivot = new Vector2(0f, 0.5f);
+                    titleRect.anchoredPosition = new Vector2(35f, 0f);
+                    titleRect.sizeDelta = new Vector2(-120f, 0f);
+                }
+                TextMeshProUGUI titleTMP = titleTr.GetComponent<TextMeshProUGUI>();
+                if (titleTMP != null)
+                {
+                    titleTMP.text = "<color=#00E5FF><b>CASE DOSSIER</b></color> <color=#455A64>//</color> <color=#90A4AE>COLLECTED EVIDENCE ARCHIVE</color>";
+                    titleTMP.fontSize = 24f;
+                    titleTMP.alignment = TextAlignmentOptions.MidlineLeft;
+                }
+            }
+        }
+
+        // 4. ضبط وتوسيع قائمة الأدلة على اليسار (EvidenceListContainer)
+        if (evidenceListContainer != null)
+        {
+            RectTransform listRect = evidenceListContainer.GetComponent<RectTransform>();
+            if (listRect != null)
+            {
+                listRect.localScale = Vector3.one;
+                listRect.anchorMin = new Vector2(0.02f, 0.04f);
+                listRect.anchorMax = new Vector2(0.32f, 0.88f);
+                listRect.offsetMin = Vector2.zero;
+                listRect.offsetMax = Vector2.zero;
+                listRect.pivot = new Vector2(0f, 1f);
+            }
+
+            VerticalLayoutGroup vlg = evidenceListContainer.GetComponent<VerticalLayoutGroup>();
+            if (vlg != null)
+            {
+                vlg.spacing = 10f;
+                vlg.padding = new RectOffset(6, 6, 8, 8);
+                vlg.childForceExpandWidth = true;
+                vlg.childForceExpandHeight = false;
+                vlg.childControlWidth = true;
+                vlg.childControlHeight = false;
+            }
+        }
+
+        // 5. ضبط وتنسيق بطاقة تفاصيل الدليل (DetailsCard) في الجانب الأيمن المنظم
+        Transform detailsCard = inventoryPanel.transform.Find("DetailsCard");
+        if (detailsCard != null)
+        {
+            RectTransform cardRect = detailsCard.GetComponent<RectTransform>();
+            if (cardRect != null)
+            {
+                cardRect.localScale = Vector3.one;
+                cardRect.anchorMin = new Vector2(0.34f, 0.04f);
+                cardRect.anchorMax = new Vector2(0.98f, 0.88f);
+                cardRect.offsetMin = Vector2.zero;
+                cardRect.offsetMax = Vector2.zero;
+                cardRect.pivot = new Vector2(0.5f, 0.5f);
+            }
+
+            Image cardImg = detailsCard.GetComponent<Image>();
+            if (cardImg != null)
+            {
+                cardImg.color = new Color(0.07f, 0.10f, 0.16f, 0.92f);
+            }
+
+            // ضبط عنوان الدليل في البطاقة
+            if (detailNameText != null)
+            {
+                RectTransform nameRect = detailNameText.GetComponent<RectTransform>();
+                if (nameRect != null)
+                {
+                    nameRect.anchorMin = new Vector2(0f, 1f);
+                    nameRect.anchorMax = new Vector2(1f, 1f);
+                    nameRect.pivot = new Vector2(0f, 1f);
+                    nameRect.anchoredPosition = new Vector2(35f, -25f);
+                    nameRect.sizeDelta = new Vector2(-70f, 48f);
+                }
+            }
+
+            // ضبط تصنيف الدليل
+            if (detailTypeText != null)
+            {
+                RectTransform typeRect = detailTypeText.GetComponent<RectTransform>();
+                if (typeRect != null)
+                {
+                    typeRect.anchorMin = new Vector2(0f, 1f);
+                    typeRect.anchorMax = new Vector2(1f, 1f);
+                    typeRect.pivot = new Vector2(0f, 1f);
+                    typeRect.anchoredPosition = new Vector2(35f, -76f);
+                    typeRect.sizeDelta = new Vector2(-70f, 32f);
+                }
+            }
+
+            // ضبط صندوق الوصف وتحليل الأدلة الجنائية
+            if (detailDescriptionText != null)
+            {
+                RectTransform descRect = detailDescriptionText.GetComponent<RectTransform>();
+                if (descRect != null)
+                {
+                    descRect.anchorMin = new Vector2(0f, 0f);
+                    descRect.anchorMax = new Vector2(1f, 1f);
+                    descRect.pivot = new Vector2(0f, 1f);
+                    descRect.anchoredPosition = new Vector2(35f, -125f);
+                    descRect.sizeDelta = new Vector2(-70f, -145f);
+                }
+            }
+        }
+    }
+
     public void ShowEvidenceDetails(Evidence evidence)
     {
-        if (detailNameText != null) detailNameText.text = evidence.evidenceName;
-        if (detailTypeText != null) detailTypeText.text = $"Type: {evidence.type}";
-        if (detailDescriptionText != null) detailDescriptionText.text = evidence.description;
+        if (evidence == null) return;
+
+        if (detailNameText != null)
+        {
+            detailNameText.text = $"<color=#FFCA28><b>{evidence.evidenceName}</b></color>";
+            detailNameText.fontSize = 28f;
+            detailNameText.alignment = TextAlignmentOptions.TopLeft;
+        }
+
+        if (detailTypeText != null)
+        {
+            string typeColor = evidence.type == EvidenceType.Physical ? "#FF5252" : (evidence.type == EvidenceType.Digital ? "#00E5FF" : "#FFD54F");
+            detailTypeText.text = $"<color=#78909C><size=80%>CLASSIFICATION:</size></color> <color={typeColor}><b>[{evidence.type.ToString().ToUpper()}]</b></color>";
+            detailTypeText.fontSize = 18f;
+            detailTypeText.alignment = TextAlignmentOptions.TopLeft;
+        }
+
+        // تنسيق أنيق ومميز لنتائج التحليل الجنائي والاستبعاد
+        string findingBlock = "";
+        if (!string.IsNullOrEmpty(evidence.eliminationFinding))
+        {
+            findingBlock = $"<color=#00E676><b>[FORENSIC EVIDENCE FINDING]</b></color>\n" +
+                           $"<color=#E8F5E9>{evidence.eliminationFinding}</color>\n\n";
+        }
+
+        string suspectBlock = "";
+        if (!string.IsNullOrEmpty(evidence.eliminatesSuspectID))
+        {
+            string suspectName = evidence.eliminatesSuspectID.Replace("SUS_", "");
+            suspectBlock = $"<color=#FF5252><b>[SUSPECT EXONERATED / ALIBI VERIFIED]</b></color>\n" +
+                           $"<color=#FFCDD2><b>{suspectName}</b> has been eliminated from suspicion by physical forensics.</color>";
+        }
+
+        if (detailDescriptionText != null)
+        {
+            string cleanDesc = !string.IsNullOrEmpty(evidence.description) ? evidence.description.Trim() : "No report details logged.";
+            detailDescriptionText.text = $"<color=#90A4AE><b>CASE NOTES & DESCRIPTION:</b></color>\n" +
+                                         $"<color=#ECEFF1>\"{cleanDesc}\"</color>\n\n" +
+                                         $"{findingBlock}{suspectBlock}";
+            detailDescriptionText.fontSize = 20f;
+            detailDescriptionText.lineSpacing = 16f;
+            detailDescriptionText.alignment = TextAlignmentOptions.TopLeft;
+        }
+
+        // ربط خيار إعادة مشاهدة فيديو الدليل إن وجد
+        if (replayEvidenceVideoBtn != null)
+        {
+            replayEvidenceVideoBtn.gameObject.SetActive(evidence.evidenceVideoClip != null);
+            replayEvidenceVideoBtn.onClick.RemoveAllListeners();
+            replayEvidenceVideoBtn.onClick.AddListener(() =>
+            {
+                if (EvidenceCutsceneManager.Instance != null && evidence.evidenceVideoClip != null)
+                {
+                    ToggleInventory(); // إغلاق الحقيبة مؤقتاً
+                    EvidenceCutsceneManager.Instance.PlayEvidenceFlow(evidence);
+                }
+            });
+        }
     }
 
     private void ClearDetails()
     {
-        if (detailNameText != null) detailNameText.text = "No Evidence Selected";
+        if (detailNameText != null) detailNameText.text = "<color=#78909C>No Evidence Selected</color>";
         if (detailTypeText != null) detailTypeText.text = "";
-        if (detailDescriptionText != null) detailDescriptionText.text = "Evidence details will appear here once inspected.";
+        if (detailDescriptionText != null) detailDescriptionText.text = "<color=#546E7A>Select a clue from the left repository to review detailed forensic analysis.</color>";
     }
 
     public void ShowInteractionPrompt(string message)
@@ -392,29 +832,216 @@ public class UIManager : MonoBehaviour
         if (inGameHUD != null) inGameHUD.SetActive(false);
         SetMobileControlsActive(false);
 
-        // إظهار لوحة النهاية
-        if (endGamePanel != null) endGamePanel.SetActive(true);
+        // إغلاق أي نوافذ أخرى
+        if (inventoryPanel != null) inventoryPanel.SetActive(false);
+        if (interrogationBoardPanel != null) interrogationBoardPanel.SetActive(false);
+        if (CaseDossierManager.Instance != null) CaseDossierManager.Instance.CloseDossier();
+
+        // إنشاء أو تجهيز لوحة النهاية بتصميم فخم ومستقل برمجياً إن لم تكن مربوطة في الـ Inspector
+        EnsureEndGamePanelCreated();
+
+        if (endGamePanel != null)
+        {
+            endGamePanel.SetActive(true);
+            endGamePanel.transform.SetAsLastSibling();
+        }
 
         // إظهار الماوس
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
-        // حساب الوقت والنقاط
+        // حساب الوقت والنقاط والرتبة
         float timeSpent = Time.time - gameStartTime;
         int minutes = Mathf.FloorToInt(timeSpent / 60);
         int seconds = Mathf.FloorToInt(timeSpent % 60);
-        
-        if (timeTakenText != null) timeTakenText.text = $"TIME TAKEN: {minutes:00}:{seconds:00}";
 
-        int evCount = EvidenceManager.Instance != null ? EvidenceManager.Instance.CollectedCount : 0;
-        if (evidenceScoreText != null) evidenceScoreText.text = $"EVIDENCE: {evCount} / 5";
+        int evCount = EvidenceManager.Instance != null ? EvidenceManager.Instance.CollectedCount : 5;
 
-        // تحديد التقييم
-        if (finalGradeText != null)
+        string rankBadge = "S";
+        string rankTitle = "MASTER DETECTIVE";
+        string rankColor = "#FFD700"; // Gold
+
+        if (evCount >= 5 && timeSpent <= 360)
         {
-            if (evCount == 5 && timeSpent < 300) finalGradeText.text = "RANK: S (MASTER DETECTIVE)";
-            else if (evCount >= 3) finalGradeText.text = "RANK: A (GREAT WORK)";
-            else finalGradeText.text = "RANK: B (CASE CLOSED)";
+            rankBadge = "S";
+            rankTitle = "MASTER DETECTIVE";
+            rankColor = "#FFD700";
+        }
+        else if (evCount >= 4)
+        {
+            rankBadge = "A";
+            rankTitle = "SENIOR INVESTIGATOR";
+            rankColor = "#00E5FF";
+        }
+        else if (evCount >= 2)
+        {
+            rankBadge = "B";
+            rankTitle = "FIELD AGENT";
+            rankColor = "#69F0AE";
+        }
+        else
+        {
+            rankBadge = "C";
+            rankTitle = "ROOKIE OFFICER";
+            rankColor = "#B0BEC5";
+        }
+
+        if (timeTakenText != null) 
+            timeTakenText.text = $"<color=#78909C>INVESTIGATION TIME</color>\n<size=125%><color=#ECEFF1><b>{minutes:00}:{seconds:00}</b></size></color>";
+
+        if (evidenceScoreText != null) 
+            evidenceScoreText.text = $"<color=#78909C>EVIDENCE COLLECTED</color>\n<size=125%><color=#ECEFF1><b>{evCount} / 5</b></size></color>";
+
+        if (finalGradeText != null) 
+            finalGradeText.text = $"<color=#78909C>FINAL EVALUATION</color>\n<size=150%><color={rankColor}><b>RANK {rankBadge}</b></color></size>\n<size=80%><color=#CFD8DC>[{rankTitle}]</color></size>";
+    }
+
+    private void EnsureEndGamePanelCreated()
+    {
+        if (endGamePanel != null)
+        {
+            ApplyPolishedEndGameLayout();
+            return;
+        }
+
+        // البحث عن الـ Canvas الرئيسي
+        Canvas mainCanvas = GetComponentInParent<Canvas>();
+        if (mainCanvas == null) mainCanvas = FindAnyObjectByType<Canvas>();
+        if (mainCanvas == null) return;
+
+        // 1. إنشاء الحاوية الرئيسية لخلفية شاشة النهاية
+        endGamePanel = new GameObject("EndGamePanel_Polished", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        endGamePanel.transform.SetParent(mainCanvas.transform, false);
+
+        RectTransform panelRt = endGamePanel.GetComponent<RectTransform>();
+        panelRt.anchorMin = Vector2.zero;
+        panelRt.anchorMax = Vector2.one;
+        panelRt.offsetMin = Vector2.zero;
+        panelRt.offsetMax = Vector2.zero;
+
+        Image panelImg = endGamePanel.GetComponent<Image>();
+        panelImg.color = new Color(0.02f, 0.04f, 0.07f, 0.97f);
+
+        // 2. بطاقة التقرير المركزية الفخمة (Card Modal)
+        GameObject card = new GameObject("EvaluationCard", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        card.transform.SetParent(endGamePanel.transform, false);
+
+        RectTransform cardRt = card.GetComponent<RectTransform>();
+        cardRt.anchorMin = new Vector2(0.5f, 0.5f);
+        cardRt.anchorMax = new Vector2(0.5f, 0.5f);
+        cardRt.pivot = new Vector2(0.5f, 0.5f);
+        cardRt.sizeDelta = new Vector2(820f, 480f);
+        cardRt.anchoredPosition = Vector2.zero;
+
+        Image cardImg = card.GetComponent<Image>();
+        cardImg.color = new Color(0.06f, 0.09f, 0.14f, 0.98f);
+
+        // 3. شريط العنوان العلوي (Header Title)
+        GameObject headerObj = new GameObject("HeaderTitle", typeof(RectTransform), typeof(TextMeshProUGUI));
+        headerObj.transform.SetParent(card.transform, false);
+        RectTransform headerRt = headerObj.GetComponent<RectTransform>();
+        headerRt.anchorMin = new Vector2(0.5f, 1f);
+        headerRt.anchorMax = new Vector2(0.5f, 1f);
+        headerRt.pivot = new Vector2(0.5f, 1f);
+        headerRt.sizeDelta = new Vector2(750f, 70f);
+        headerRt.anchoredPosition = new Vector2(0f, -25f);
+
+        TextMeshProUGUI headerTmp = headerObj.GetComponent<TextMeshProUGUI>();
+        headerTmp.text = "<color=#00E5FF><b>CASE 13 // RESOLVED</b></color>\n<size=55%><color=#78909C>OFFICIAL FORENSIC BUREAU DEBRIEFING</color></size>";
+        headerTmp.alignment = TextAlignmentOptions.Center;
+        headerTmp.fontSize = 28f;
+
+        // 4. الرتبة الكبيرة في المركز (Rank Badge)
+        GameObject gradeObj = new GameObject("FinalGradeText", typeof(RectTransform), typeof(TextMeshProUGUI));
+        gradeObj.transform.SetParent(card.transform, false);
+        RectTransform gradeRt = gradeObj.GetComponent<RectTransform>();
+        gradeRt.anchorMin = new Vector2(0.5f, 0.5f);
+        gradeRt.anchorMax = new Vector2(0.5f, 0.5f);
+        gradeRt.pivot = new Vector2(0.5f, 0.5f);
+        gradeRt.sizeDelta = new Vector2(750f, 130f);
+        gradeRt.anchoredPosition = new Vector2(0f, 45f);
+
+        finalGradeText = gradeObj.GetComponent<TextMeshProUGUI>();
+        finalGradeText.alignment = TextAlignmentOptions.Center;
+        finalGradeText.fontSize = 24f;
+
+        // 5. قسم الوقت المستغرق (Time Taken) في اليسار
+        GameObject timeObj = new GameObject("TimeTakenText", typeof(RectTransform), typeof(TextMeshProUGUI));
+        timeObj.transform.SetParent(card.transform, false);
+        RectTransform timeRt = timeObj.GetComponent<RectTransform>();
+        timeRt.anchorMin = new Vector2(0.5f, 0.5f);
+        timeRt.anchorMax = new Vector2(0.5f, 0.5f);
+        timeRt.pivot = new Vector2(0.5f, 0.5f);
+        timeRt.sizeDelta = new Vector2(320f, 70f);
+        timeRt.anchoredPosition = new Vector2(-190f, -65f);
+
+        timeTakenText = timeObj.GetComponent<TextMeshProUGUI>();
+        timeTakenText.alignment = TextAlignmentOptions.Center;
+        timeTakenText.fontSize = 18f;
+
+        // 6. قسم النقاط والأدلة (Evidence Score) في اليمين
+        GameObject scoreObj = new GameObject("EvidenceScoreText", typeof(RectTransform), typeof(TextMeshProUGUI));
+        scoreObj.transform.SetParent(card.transform, false);
+        RectTransform scoreRt = scoreObj.GetComponent<RectTransform>();
+        scoreRt.anchorMin = new Vector2(0.5f, 0.5f);
+        scoreRt.anchorMax = new Vector2(0.5f, 0.5f);
+        scoreRt.pivot = new Vector2(0.5f, 0.5f);
+        scoreRt.sizeDelta = new Vector2(320f, 70f);
+        scoreRt.anchoredPosition = new Vector2(190f, -65f);
+
+        evidenceScoreText = scoreObj.GetComponent<TextMeshProUGUI>();
+        evidenceScoreText.alignment = TextAlignmentOptions.Center;
+        evidenceScoreText.fontSize = 18f;
+
+        // 7. زر الرجوع للقائمة الرئيسية / إنهاء التحقيق (Return Button)
+        GameObject returnBtnObj = new GameObject("ReturnToMenuBtn", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        returnBtnObj.transform.SetParent(card.transform, false);
+        RectTransform btnRt = returnBtnObj.GetComponent<RectTransform>();
+        btnRt.anchorMin = new Vector2(0.5f, 0f);
+        btnRt.anchorMax = new Vector2(0.5f, 0f);
+        btnRt.pivot = new Vector2(0.5f, 0f);
+        btnRt.sizeDelta = new Vector2(340f, 52f);
+        btnRt.anchoredPosition = new Vector2(0f, 30f);
+
+        Image btnImg = returnBtnObj.GetComponent<Image>();
+        btnImg.color = new Color(0.08f, 0.35f, 0.42f, 0.95f);
+
+        Button returnBtn = returnBtnObj.GetComponent<Button>();
+        returnBtn.onClick.RemoveAllListeners();
+        returnBtn.onClick.AddListener(ReturnToMainMenu);
+
+        GameObject btnLabel = new GameObject("BtnLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
+        btnLabel.transform.SetParent(returnBtnObj.transform, false);
+        RectTransform labelRt = btnLabel.GetComponent<RectTransform>();
+        labelRt.anchorMin = Vector2.zero;
+        labelRt.anchorMax = Vector2.one;
+        labelRt.offsetMin = Vector2.zero;
+        labelRt.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI labelTmp = btnLabel.GetComponent<TextMeshProUGUI>();
+        labelTmp.text = "<b>RETURN TO MAIN MENU</b>";
+        labelTmp.alignment = TextAlignmentOptions.Center;
+        labelTmp.fontSize = 18f;
+        labelTmp.color = Color.white;
+    }
+
+    private void ApplyPolishedEndGameLayout()
+    {
+        if (endGamePanel == null) return;
+
+        RectTransform panelRt = endGamePanel.GetComponent<RectTransform>();
+        if (panelRt != null)
+        {
+            panelRt.anchorMin = Vector2.zero;
+            panelRt.anchorMax = Vector2.one;
+            panelRt.offsetMin = Vector2.zero;
+            panelRt.offsetMax = Vector2.zero;
+        }
+
+        Image panelImg = endGamePanel.GetComponent<Image>();
+        if (panelImg != null)
+        {
+            panelImg.color = new Color(0.02f, 0.04f, 0.07f, 0.97f);
         }
     }
 
@@ -426,6 +1053,7 @@ public class UIManager : MonoBehaviour
 
     public void ToggleSettings()
     {
+        EnsureSettingsPanelCreated();
         if (settingsPanel == null) return;
         
         bool isOpen = !settingsPanel.activeSelf;
@@ -433,6 +1061,7 @@ public class UIManager : MonoBehaviour
         
         if (isOpen)
         {
+            settingsPanel.transform.SetAsLastSibling();
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }
@@ -441,5 +1070,89 @@ public class UIManager : MonoBehaviour
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
+    }
+
+    private void EnsureSettingsPanelCreated()
+    {
+        if (settingsPanel != null) return;
+
+        Canvas mainCanvas = GetComponentInParent<Canvas>();
+        if (mainCanvas == null) mainCanvas = FindAnyObjectByType<Canvas>();
+        if (mainCanvas == null) return;
+
+        // خلفية داكنة شاملة للشاشة
+        settingsPanel = new GameObject("InGameSettingsPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        settingsPanel.transform.SetParent(mainCanvas.transform, false);
+
+        RectTransform panelRt = settingsPanel.GetComponent<RectTransform>();
+        panelRt.anchorMin = Vector2.zero;
+        panelRt.anchorMax = Vector2.one;
+        panelRt.offsetMin = Vector2.zero;
+        panelRt.offsetMax = Vector2.zero;
+
+        Image panelImg = settingsPanel.GetComponent<Image>();
+        panelImg.color = new Color(0.03f, 0.05f, 0.09f, 0.95f);
+
+        // بطاقة الإعدادات المركزية
+        GameObject card = new GameObject("SettingsCard", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        card.transform.SetParent(settingsPanel.transform, false);
+
+        RectTransform cardRt = card.GetComponent<RectTransform>();
+        cardRt.anchorMin = new Vector2(0.5f, 0.5f);
+        cardRt.anchorMax = new Vector2(0.5f, 0.5f);
+        cardRt.pivot = new Vector2(0.5f, 0.5f);
+        cardRt.sizeDelta = new Vector2(700f, 440f);
+        cardRt.anchoredPosition = Vector2.zero;
+
+        Image cardImg = card.GetComponent<Image>();
+        cardImg.color = new Color(0.07f, 0.10f, 0.16f, 0.98f);
+
+        // العنوان
+        GameObject titleObj = new GameObject("TitleText", typeof(RectTransform), typeof(TextMeshProUGUI));
+        titleObj.transform.SetParent(card.transform, false);
+        RectTransform titleRt = titleObj.GetComponent<RectTransform>();
+        titleRt.anchorMin = new Vector2(0.5f, 1f);
+        titleRt.anchorMax = new Vector2(0.5f, 1f);
+        titleRt.pivot = new Vector2(0.5f, 1f);
+        titleRt.sizeDelta = new Vector2(600f, 60f);
+        titleRt.anchoredPosition = new Vector2(0f, -25f);
+
+        TextMeshProUGUI titleTmp = titleObj.GetComponent<TextMeshProUGUI>();
+        titleTmp.text = "<color=#00E5FF><b>GAME SETTINGS</b></color> <color=#455A64>//</color> <color=#90A4AE>SYSTEM CONFIG</color>";
+        titleTmp.alignment = TextAlignmentOptions.Center;
+        titleTmp.fontSize = 24f;
+
+        // إضافة سكربت SettingsManager وتوليد أزراره وخياراته
+        SettingsManager sm = card.AddComponent<SettingsManager>();
+
+        // زر إغلاق الإعدادات (Close Button)
+        GameObject closeBtnObj = new GameObject("CloseSettingsBtn", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        closeBtnObj.transform.SetParent(card.transform, false);
+        RectTransform closeRt = closeBtnObj.GetComponent<RectTransform>();
+        closeRt.anchorMin = new Vector2(0.5f, 0f);
+        closeRt.anchorMax = new Vector2(0.5f, 0f);
+        closeRt.pivot = new Vector2(0.5f, 0f);
+        closeRt.sizeDelta = new Vector2(260f, 48f);
+        closeRt.anchoredPosition = new Vector2(0f, 25f);
+
+        Image closeImg = closeBtnObj.GetComponent<Image>();
+        closeImg.color = new Color(0.10f, 0.35f, 0.45f, 0.95f);
+
+        Button closeBtn = closeBtnObj.GetComponent<Button>();
+        closeBtn.onClick.AddListener(ToggleSettings);
+
+        GameObject closeLbl = new GameObject("CloseLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
+        closeLbl.transform.SetParent(closeBtnObj.transform, false);
+        RectTransform lblRt = closeLbl.GetComponent<RectTransform>();
+        lblRt.anchorMin = Vector2.zero;
+        lblRt.anchorMax = Vector2.one;
+        lblRt.offsetMin = Vector2.zero;
+        lblRt.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI lblTmp = closeLbl.GetComponent<TextMeshProUGUI>();
+        lblTmp.text = "<b>RESUME GAME</b>";
+        lblTmp.alignment = TextAlignmentOptions.Center;
+        lblTmp.fontSize = 18f;
+        lblTmp.color = Color.white;
     }
 }

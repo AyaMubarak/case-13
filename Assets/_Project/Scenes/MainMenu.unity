@@ -5263,6 +5263,14 @@ MonoBehaviour:
   createRoomButton: {fileID: 1128927161}
   joinRoomButton: {fileID: 909641055}
   characterSelectPanel: {fileID: 1082484655}
+  fieldDetectiveSprite: {fileID: 21300000, guid: 1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e, type: 3}
+  forensicsExpertSprite: {fileID: 21300000, guid: 2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e, type: 3}
+  digitalAnalystSprite: {fileID: 21300000, guid: 3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f, type: 3}
+  interrogatorSprite: {fileID: 21300000, guid: 4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a, type: 3}
+  player1RoleImage: {fileID: 188975541}
+  player2RoleImage: {fileID: 1057033464}
+  player3RoleImage: {fileID: 212804888}
+  player4RoleImage: {fileID: 1752434364}
 --- !u!1 &1044473354
 GameObject:
   m_ObjectHideFlags: 0
