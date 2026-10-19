@@ -22,6 +22,13 @@ public class CaseIntroCutscene : MonoBehaviour
 
     private void Awake()
     {
+        if (videoPlayer == null)
+        {
+            isCutsceneFinished = true;
+            IsPlaying = false;
+            return;
+        }
+
         IsPlaying = true; // قبل أي Start في باقي السكربتات
 
         if (skipButton != null)
@@ -38,6 +45,11 @@ public class CaseIntroCutscene : MonoBehaviour
 
     private void Start()
     {
+        if (videoPlayer == null || (videoPlayer.clip == null && string.IsNullOrEmpty(videoPlayer.url)))
+        {
+            EndCutscene();
+            return;
+        }
         StartCutscene();
     }
 

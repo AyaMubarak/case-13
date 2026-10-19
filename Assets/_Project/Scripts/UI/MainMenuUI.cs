@@ -42,10 +42,40 @@ public class MainMenuUI : MonoBehaviour
         if(characterSelectPanel != null) characterSelectPanel.SetActive(true);
     }
 
+    public static string SelectedCaseScene = "Case01_Main";
+
+    public void SelectCase1()
+    {
+        SelectedCaseScene = "Case01_Main";
+        PlayerPrefs.SetString("Selected_Case", "Case01_Main");
+        PlayerPrefs.Save();
+        Debug.Log("[CASE SELECTION] Selected Case 01: The Midnight Murder");
+    }
+
+    public void SelectCase2()
+    {
+        SelectedCaseScene = "Case02_Main";
+        PlayerPrefs.SetString("Selected_Case", "Case02_Main");
+        PlayerPrefs.Save();
+        Debug.Log("[CASE SELECTION] Selected Case 02: The Cypher Vault Protocol");
+    }
+
     public void StartGame()
     {
-        // تحميل مشهد اللعبة (تأكدي أن المشهد الخاص باللعبة رقم 1 في الـ Build Settings)
-        SceneManager.LoadScene(1);
+        string sceneToLoad = PlayerPrefs.GetString("Selected_Case", SelectedCaseScene);
+        SceneManager.LoadScene(sceneToLoad);
+    }
+
+    public void StartCase1()
+    {
+        SelectCase1();
+        SceneManager.LoadScene("Case01_Main");
+    }
+
+    public void StartCase2()
+    {
+        SelectCase2();
+        SceneManager.LoadScene("Case02_Main");
     }
 
     public void OpenQuitPanel()

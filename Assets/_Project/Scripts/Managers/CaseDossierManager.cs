@@ -547,7 +547,19 @@ public class CaseDossierManager : MonoBehaviour
     {
         Debug.Log("<color=green>[CASE READY] All 5 evidences collected! Final confrontation unlocked between Nora and Evan.</color>");
         if (interrogationPromptUI != null) interrogationPromptUI.SetActive(true);
-        if (confrontBtn != null) confrontBtn.interactable = true;
+        if (confrontBtn != null)
+        {
+            confrontBtn.interactable = true;
+            confrontBtn.onClick.RemoveAllListeners();
+            confrontBtn.onClick.AddListener(() =>
+            {
+                CloseDossier();
+                if (SeparateInterrogationManager.Instance != null)
+                {
+                    SeparateInterrogationManager.Instance.OpenLogPanel();
+                }
+            });
+        }
     }
 
     public void OpenDossier()

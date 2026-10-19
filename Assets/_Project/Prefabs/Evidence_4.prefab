@@ -1,0 +1,95 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &830320572220924963
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -6689036041284674117, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+      propertyPath: m_Name
+      value: Evidence_4
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 6.57025
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 3.349
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 1.484
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: -6689036041284674117, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4180792859217798037}
+  m_SourcePrefab: {fileID: -5645937942226959685, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+--- !u!1 &2931316692717697432 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -6689036041284674117, guid: c2e788c97b496a44895910f4ee37a064, type: 3}
+  m_PrefabInstance: {fileID: 830320572220924963}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &4180792859217798037
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2931316692717697432}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e81101867ae7734b901956360ca7726, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Evidence
+  evidenceID: EV_04
+  evidenceName: Audio Wiretap Memo
+  type: 1
+  description: Encrypted audio memo captured by the emergency security mic seconds before the vault breached
+  requiredRole: 3
+  evidenceVideoClip: {fileID: 32900000, guid: dadbec3790e18bc43b0d6ed56f48eccd, type: 3}
+  eliminatesSuspectID: SUS_VICTOR
+  eliminationFinding: Spectrogram analysis isolates a female voice whisper, narrowing suspects down to Elena Rostova.
+  quizQuestion: What acoustic voice profile was identified in the wiretap recording?
+  options:
+  - Low male resonance matching Victor
+  - Female acoustic frequency matching Elena
+  - Automated security synthesized voice
+  - Indistinguishable white noise
+  correctOptionIndex: 1
+  promptMessage: Press [E] to Collect Evidence

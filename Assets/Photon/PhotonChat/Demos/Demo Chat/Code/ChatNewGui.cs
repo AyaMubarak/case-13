@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,6 +35,7 @@ namespace Photon.Chat.DemoChat
 
         private string selectedChannelName; // mainly used for GUI/input
 
+        [System.NonSerialized]
         public ChatClient chatClient;
         
         public GameObject ConnectingLabel;

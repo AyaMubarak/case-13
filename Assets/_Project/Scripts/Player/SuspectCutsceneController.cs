@@ -530,6 +530,7 @@ public class SeparateInterrogationManager : MonoBehaviour
             if (UIManager.Instance != null)
             {
                 UIManager.Instance.SetMobileControlsActive(false);
+                if (UIManager.Instance.inGameHUD != null) UIManager.Instance.inGameHUD.SetActive(false);
             }
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -540,7 +541,7 @@ public class SeparateInterrogationManager : MonoBehaviour
     {
         if (interrogationLogPanel == null) return;
 
-        // 1. إعادة ضبط أبعاد لوحة الاستجواب الرئيسية
+        // 1. إعادة ضبط أبعاد وخلفية لوحة الاستجواب الرئيسية مع تعتيم سينمائي كامل يمنع تسرب خلفية الغرفة
         RectTransform mainRt = interrogationLogPanel.GetComponent<RectTransform>();
         if (mainRt != null)
         {
@@ -553,7 +554,7 @@ public class SeparateInterrogationManager : MonoBehaviour
         Image panelBg = interrogationLogPanel.GetComponent<Image>();
         if (panelBg != null)
         {
-            panelBg.color = new Color(0.04f, 0.05f, 0.08f, 0.98f);
+            panelBg.color = new Color(0.03f, 0.04f, 0.07f, 0.99f); // Solid Onyx Black
         }
 
         // 2. ربط وضبط زر الإغلاق (X)
@@ -570,19 +571,19 @@ public class SeparateInterrogationManager : MonoBehaviour
                 closeRt.anchorMax = new Vector2(1f, 1f);
                 closeRt.pivot = new Vector2(1f, 1f);
                 closeRt.anchoredPosition = new Vector2(-25f, -25f);
-                closeRt.sizeDelta = new Vector2(50f, 50f);
+                closeRt.sizeDelta = new Vector2(48f, 48f);
             }
         }
 
-        // 3. تنسيق وإخفاء أي نصوص متكررة أو خارج السياق
+        // 3. تنسيق عنوان الشاشة الرئيسي بدقة عالية وتنسيق جنائي فاخر
         Transform titleTr = interrogationLogPanel.transform.Find("SUSPECT INTERROGATION TRANSCRIPTS");
         if (titleTr != null)
         {
             var titleText = titleTr.GetComponent<TMP_Text>();
             if (titleText != null)
             {
-                titleText.text = "<color=#FFC107><b>SUSPECTS DOSSIER</b></color> <color=#546E7A>//</color> <color=#CFD8DC>TRANSCRIPTS & FINAL ACCUSATION</color>";
-                titleText.fontSize = 22f;
+                titleText.text = "<size=115%><color=#00E5FF><b>SUSPECTS DOSSIER</b></color> <color=#455A64>//</color> <color=#FFC107><b>FINAL CONFRONTATION</b></color></size>\n<size=75%><color=#90A4AE>REVIEW INTERROGATION TESTIMONY & SUBMIT FINAL ACCUSATION</color></size>";
+                titleText.fontSize = 20f;
                 titleText.alignment = TextAlignmentOptions.Center;
             }
             RectTransform titleRt = titleTr.GetComponent<RectTransform>();
@@ -591,8 +592,8 @@ public class SeparateInterrogationManager : MonoBehaviour
                 titleRt.anchorMin = new Vector2(0f, 1f);
                 titleRt.anchorMax = new Vector2(1f, 1f);
                 titleRt.pivot = new Vector2(0.5f, 1f);
-                titleRt.anchoredPosition = new Vector2(0f, -25f);
-                titleRt.sizeDelta = new Vector2(0f, 50f);
+                titleRt.anchoredPosition = new Vector2(0f, -20f);
+                titleRt.sizeDelta = new Vector2(0f, 65f);
             }
         }
 
@@ -604,7 +605,7 @@ public class SeparateInterrogationManager : MonoBehaviour
             if (cardsRt != null)
             {
                 cardsRt.anchorMin = new Vector2(0.04f, 0.04f);
-                cardsRt.anchorMax = new Vector2(0.96f, 0.88f);
+                cardsRt.anchorMax = new Vector2(0.96f, 0.85f);
                 cardsRt.offsetMin = Vector2.zero;
                 cardsRt.offsetMax = Vector2.zero;
             }
@@ -616,8 +617,8 @@ public class SeparateInterrogationManager : MonoBehaviour
                 hlg.childControlWidth = true;
                 hlg.childForceExpandHeight = true;
                 hlg.childForceExpandWidth = true;
-                hlg.padding = new RectOffset(20, 20, 15, 15);
-                hlg.spacing = 30;
+                hlg.padding = new RectOffset(20, 20, 10, 10);
+                hlg.spacing = 35;
                 hlg.childAlignment = TextAnchor.MiddleCenter;
             }
 
@@ -632,11 +633,11 @@ public class SeparateInterrogationManager : MonoBehaviour
     {
         if (cardTransform == null || suspect == null) return;
 
-        // مظهر وخلفية الكرت
+        // مظهر وخلفية كرت المتهم بلون نيلي كحلي أنيق
         Image cardImg = cardTransform.GetComponent<Image>();
         if (cardImg != null)
         {
-            cardImg.color = new Color(0.10f, 0.13f, 0.19f, 0.98f);
+            cardImg.color = new Color(0.08f, 0.11f, 0.17f, 0.98f);
         }
 
         var vlg = cardTransform.GetComponent<VerticalLayoutGroup>();
@@ -646,7 +647,7 @@ public class SeparateInterrogationManager : MonoBehaviour
             vlg.childControlWidth = true;
             vlg.childForceExpandHeight = false;
             vlg.childForceExpandWidth = true;
-            vlg.padding = new RectOffset(20, 20, 18, 18);
+            vlg.padding = new RectOffset(22, 22, 16, 16);
             vlg.spacing = 10;
             vlg.childAlignment = TextAnchor.UpperCenter;
         }
@@ -659,7 +660,7 @@ public class SeparateInterrogationManager : MonoBehaviour
             if (pRt != null)
             {
                 pRt.anchoredPosition = Vector2.zero;
-                pRt.sizeDelta = new Vector2(0f, 150f);
+                pRt.sizeDelta = new Vector2(0f, 135f);
             }
             var img = portraitTr.GetComponent<Image>();
             if (img != null)
@@ -670,12 +671,12 @@ public class SeparateInterrogationManager : MonoBehaviour
             }
             var le = portraitTr.GetComponent<LayoutElement>();
             if (le == null) le = portraitTr.gameObject.AddComponent<LayoutElement>();
-            le.preferredHeight = 150f;
-            le.minHeight = 130f;
+            le.preferredHeight = 135f;
+            le.minHeight = 120f;
             le.flexibleHeight = 0f;
         }
 
-        // 2. اسم المتهم (Name)
+        // 2. اسم المتهم وشارة حالته (Name & Status Badge)
         Transform nameTr = cardTransform.Find("Txt_EvanName");
         if (nameTr != null)
         {
@@ -683,24 +684,23 @@ public class SeparateInterrogationManager : MonoBehaviour
             if (nRt != null)
             {
                 nRt.anchoredPosition = Vector2.zero;
-                nRt.sizeDelta = new Vector2(0f, 32f);
+                nRt.sizeDelta = new Vector2(0f, 44f);
             }
             var txt = nameTr.GetComponent<TMP_Text>();
             if (txt != null)
             {
-                txt.text = $"<b>{suspect.suspectName}</b>";
-                txt.fontSize = 20f;
-                txt.color = new Color(1f, 0.85f, 0.25f);
+                txt.text = $"<size=115%><color=#ECEFF1><b>{suspect.suspectName.ToUpper()}</b></color></size>\n<size=70%><color=#FFB74D>[PRIMARY SUSPECT // ALIBI CONTESTED]</color></size>";
+                txt.fontSize = 17f;
                 txt.alignment = TextAlignmentOptions.Center;
             }
             var le = nameTr.GetComponent<LayoutElement>();
             if (le == null) le = nameTr.gameObject.AddComponent<LayoutElement>();
-            le.preferredHeight = 32f;
-            le.minHeight = 30f;
+            le.preferredHeight = 44f;
+            le.minHeight = 40f;
             le.flexibleHeight = 0f;
         }
 
-        // 3. الأقوال ونصوص الاستجواب (Statement)
+        // 3. الأقوال ونصوص الاستجواب (Statement) مع حل مشكلة المربعات عبر نصوص واضحة ومقروءة
         Transform statementTr = (suspect == suspect1) ? cardTransform.Find("Txt_EvanStatement") : cardTransform.Find("Txt_NoraStatement");
         if (statementTr == null) statementTr = cardTransform.Find("Txt_EvanStatement");
         if (statementTr != null)
@@ -709,13 +709,18 @@ public class SeparateInterrogationManager : MonoBehaviour
             if (sRt != null)
             {
                 sRt.anchoredPosition = Vector2.zero;
-                sRt.sizeDelta = new Vector2(0f, 150f);
+                sRt.sizeDelta = new Vector2(0f, 160f);
             }
             var txt = statementTr.GetComponent<TMP_Text>();
             if (txt != null)
             {
-                txt.text = $"<color=#FFD54F><b>سؤال المحقق:</b></color>\n\"{suspect.detectiveDialogueText}\"\n\n<color=#80D8FF><b>أقوال المتهم:</b></color>\n\"{suspect.suspectDialogueText}\"";
-                txt.fontSize = 13.5f;
+                // استخدام عناوين إنجليزية جنائية واضحة لتفادي المربعات الناتجة عن نقص خط الحروف العربية في الـ Font Asset
+                txt.text = $"<color=#00E5FF><b>INVESTIGATOR:</b></color>\n" +
+                           $"<color=#ECEFF1>\"{suspect.detectiveDialogueText}\"</color>\n\n" +
+                           $"<color=#FFD54F><b>SUSPECT TESTIMONY:</b></color>\n" +
+                           $"<color=#FFFFFF>\"{suspect.suspectDialogueText}\"</color>";
+                txt.fontSize = 14.5f;
+                txt.lineSpacing = 10f;
                 txt.color = Color.white;
                 txt.alignment = TextAlignmentOptions.TopLeft;
                 txt.textWrappingMode = TextWrappingModes.Normal;
@@ -723,8 +728,8 @@ public class SeparateInterrogationManager : MonoBehaviour
             }
             var le = statementTr.GetComponent<LayoutElement>();
             if (le == null) le = statementTr.gameObject.AddComponent<LayoutElement>();
-            le.preferredHeight = 150f;
-            le.minHeight = 120f;
+            le.preferredHeight = 160f;
+            le.minHeight = 140f;
             le.flexibleHeight = 1f;
         }
 
@@ -746,14 +751,14 @@ public class SeparateInterrogationManager : MonoBehaviour
             accuseBtn = newAccuseBtnObj.GetComponent<Button>();
         }
 
-        // ضبط وتنسيق زر إعادة تشغيل الصوت (Replay Audio)
+        // ضبط وتنسيق زر إعادة تشغيل الصوت (Replay Audio) بدون رموز غريبة تسبب مربعات
         if (replayBtn != null)
         {
             RectTransform rRt = replayBtn.GetComponent<RectTransform>();
             if (rRt != null)
             {
                 rRt.anchoredPosition = Vector2.zero;
-                rRt.sizeDelta = new Vector2(0f, 38f);
+                rRt.sizeDelta = new Vector2(0f, 40f);
             }
             replayBtn.onClick.RemoveAllListeners();
             replayBtn.onClick.AddListener(() =>
@@ -767,43 +772,43 @@ public class SeparateInterrogationManager : MonoBehaviour
             });
 
             Image repImg = replayBtn.GetComponent<Image>();
-            if (repImg != null) repImg.color = new Color(0.18f, 0.35f, 0.55f, 0.95f);
+            if (repImg != null) repImg.color = new Color(0.12f, 0.28f, 0.46f, 0.95f);
 
             TMP_Text repTxt = replayBtn.GetComponentInChildren<TMP_Text>();
             if (repTxt != null)
             {
-                repTxt.text = "▶ Replay Audio";
-                repTxt.fontSize = 14f;
+                repTxt.text = "<b>PLAY AUDIO TRANSCRIPT</b>";
+                repTxt.fontSize = 13.5f;
                 repTxt.color = Color.white;
                 repTxt.alignment = TextAlignmentOptions.Center;
             }
 
             var le = replayBtn.GetComponent<LayoutElement>();
             if (le == null) le = replayBtn.gameObject.AddComponent<LayoutElement>();
-            le.preferredHeight = 38f;
-            le.minHeight = 38f;
+            le.preferredHeight = 40f;
+            le.minHeight = 40f;
             le.flexibleHeight = 0f;
         }
 
-        // ضبط وتنسيق زر توجيه الاتهام النهائي (Accuse Suspect)
+        // ضبط وتنسيق زر توجيه الاتهام النهائي (Accuse Suspect) بلون أحمر قرمزي فخم وواضح
         if (accuseBtn != null)
         {
             RectTransform aRt = accuseBtn.GetComponent<RectTransform>();
             if (aRt != null)
             {
                 aRt.anchoredPosition = Vector2.zero;
-                aRt.sizeDelta = new Vector2(0f, 42f);
+                aRt.sizeDelta = new Vector2(0f, 46f);
             }
             accuseBtn.onClick.RemoveAllListeners();
             accuseBtn.onClick.AddListener(() => OnAccuseSuspectClicked(suspect.suspectName));
 
             Image accImg = accuseBtn.GetComponent<Image>();
-            if (accImg != null) accImg.color = new Color(0.85f, 0.22f, 0.22f, 1f);
+            if (accImg != null) accImg.color = new Color(0.85f, 0.20f, 0.20f, 1f);
 
             TMP_Text accTxt = accuseBtn.GetComponentInChildren<TMP_Text>();
             if (accTxt != null)
             {
-                accTxt.text = $"⚔ ACCUSE {suspect.suspectName.ToUpper()}";
+                accTxt.text = $"<b>ACCUSE {suspect.suspectName.ToUpper()}</b>";
                 accTxt.fontSize = 15f;
                 accTxt.fontStyle = FontStyles.Bold;
                 accTxt.color = Color.white;
@@ -812,8 +817,8 @@ public class SeparateInterrogationManager : MonoBehaviour
 
             var le = accuseBtn.GetComponent<LayoutElement>();
             if (le == null) le = accuseBtn.gameObject.AddComponent<LayoutElement>();
-            le.preferredHeight = 42f;
-            le.minHeight = 42f;
+            le.preferredHeight = 46f;
+            le.minHeight = 46f;
             le.flexibleHeight = 0f;
         }
 
@@ -840,18 +845,53 @@ public class SeparateInterrogationManager : MonoBehaviour
         }
         else
         {
-            // فحص الاتهام الافتراضي (Nora Blake هي القاتلة)
-            if (accusedName.ToLower().Contains("nora"))
+            // فحص الاتهام (Nora Blake في القضية الأولى أو Elena Rostova في القضية الثانية)
+            bool isGuilty = accusedName.ToLower().Contains("nora") || accusedName.ToLower().Contains("elena");
+            if (isGuilty)
             {
-                if (UIManager.Instance != null) UIManager.Instance.ShowOnScreenNotification("CORRECT ACCUSATION! NORA BLAKE APPREHENDED. CASE CLOSED!");
+                if (ScoreManager.Instance != null)
+                {
+                    ScoreManager.Instance.AddScore(100);
+                }
+
+                if (UIManager.Instance != null)
+                {
+                    UIManager.Instance.ShowOnScreenNotification($"CORRECT ACCUSATION! {accusedName.ToUpper()} APPREHENDED. CASE CLOSED!");
+                }
+
+                AudioClip winClip = Resources.Load<AudioClip>("Audio/meldix-success-340660");
+                if (winClip != null && Camera.main != null)
+                {
+                    AudioSource.PlayClipAtPoint(winClip, Camera.main.transform.position);
+                }
+
+                StartCoroutine(ShowEndGameDelayed(1.8f));
             }
             else
             {
-                if (UIManager.Instance != null) UIManager.Instance.ShowOnScreenNotification("WRONG ACCUSATION! EVAN HART IS INNOCENT.");
+                if (UIManager.Instance != null)
+                {
+                    UIManager.Instance.ShowOnScreenNotification($"WRONG ACCUSATION! {accusedName.ToUpper()} IS INNOCENT.");
+                }
+
+                AudioClip errorClip = Resources.Load<AudioClip>("Audio/u_xg7ssi08yr-error-tone-10-363618");
+                if (errorClip != null && Camera.main != null)
+                {
+                    AudioSource.PlayClipAtPoint(errorClip, Camera.main.transform.position);
+                }
             }
         }
 
         CloseLogPanel();
+    }
+
+    private IEnumerator ShowEndGameDelayed(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.ShowEndGameScreen();
+        }
     }
 
     public void CloseLogPanel()

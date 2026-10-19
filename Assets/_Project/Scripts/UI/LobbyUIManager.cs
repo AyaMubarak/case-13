@@ -359,8 +359,8 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
         if (PhotonNetwork.IsMasterClient)
         {
             UpdateStatus("Loading Game Scene...");
-            // تغيير الانتقال ليعتمد على رقم المشهد (1) كما في إعداداتك السابقة
-            PhotonNetwork.LoadLevel(1); 
+            string sceneToLoad = PlayerPrefs.GetString("Selected_Case", "Case01_Main");
+            PhotonNetwork.LoadLevel(sceneToLoad); 
         }
     }
 

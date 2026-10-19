@@ -1,0 +1,105 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &6838148583751290611
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -5567235259229454319, guid: 44c40d1106daf0043a3cd1716fc4dca0, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.286
+      objectReference: {fileID: 0}
+    - target: {fileID: -5567235259229454319, guid: 44c40d1106daf0043a3cd1716fc4dca0, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0.013
+      objectReference: {fileID: 0}
+    - target: {fileID: -6689036041284674117, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+      propertyPath: m_Name
+      value: Evidence_1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0.653
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -2.288
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0.364
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: -6689036041284674117, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6827905068789167825}
+  m_SourcePrefab: {fileID: -5645937942226959685, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+--- !u!1 &9065252099442807624 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -6689036041284674117, guid: 4efb55136ccde7449980a5edb9bf269d, type: 3}
+  m_PrefabInstance: {fileID: 6838148583751290611}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &6827905068789167825
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9065252099442807624}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e81101867ae7734b901956360ca7726, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Evidence
+  evidenceID: EV_01
+  evidenceName: Cyanide Coffee Mug
+  type: 0
+  description: 'Ceramic coffee mug containing traces of potassium cyanide and partial thumb friction ridges.
+
+'
+  requiredRole: 2
+  evidenceVideoClip: {fileID: 32900000, guid: f2226080c12f6804d91bfb5f56754d7c, type: 3}
+  eliminatesSuspectID: SUS_DAMIAN
+  eliminationFinding: Damian was stationed outside at the main security gate; the lethal compound is lab-grade potassium cyanide.
+  quizQuestion: What chemical compound was detected in the victim's coffee mug residue?
+  options:
+  - Arsenic Trioxide
+  - Potassium Cyanide
+  - Thallium Sulfate
+  - Strychnine Base
+  correctOptionIndex: 1
+  promptMessage: Press [E] to Collect Evidence

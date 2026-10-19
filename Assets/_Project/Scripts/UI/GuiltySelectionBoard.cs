@@ -37,7 +37,12 @@ public class GuiltySelectionBoard : MonoBehaviour
     // تُربط هذه الدالة في كل زر للمتهمين في اللوحة الجماعية وتمرر اسمه كـ parameter
     public void SelectSuspect(string suspectName)
     {
-        if (suspectName.ToLower() == correctGuiltyName.ToLower())
+        bool isMatch = !string.IsNullOrEmpty(correctGuiltyName) && 
+                       (suspectName.Equals(correctGuiltyName, System.StringComparison.OrdinalIgnoreCase) ||
+                        suspectName.ToLower().Contains(correctGuiltyName.ToLower()) ||
+                        correctGuiltyName.ToLower().Contains(suspectName.ToLower()));
+
+        if (isMatch)
         {
             Debug.Log("<color=green>CORRECT SUSPECT!</color> Case Solved!");
             
@@ -57,6 +62,8 @@ public class GuiltySelectionBoard : MonoBehaviour
             {
                 AudioSource.PlayClipAtPoint(winClip, Camera.main.transform.position);
             }
+
+            StartCoroutine(ShowEndGameDelayed(1.8f));
         }
         else
         {
@@ -76,5 +83,14 @@ public class GuiltySelectionBoard : MonoBehaviour
         }
         
         CloseBoard();
+    }
+
+    private System.Collections.IEnumerator ShowEndGameDelayed(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.ShowEndGameScreen();
+        }
     }
 }

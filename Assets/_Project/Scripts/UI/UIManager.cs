@@ -85,6 +85,7 @@ public class UIManager : MonoBehaviour
                 containerRt.anchorMax = Vector2.one;
                 containerRt.offsetMin = Vector2.zero;
                 containerRt.offsetMax = Vector2.zero;
+                containerRt.sizeDelta = Vector2.zero;
             }
 
             Transform interr = uiContainer.transform.Find("InterrogationPanel");
@@ -93,6 +94,25 @@ public class UIManager : MonoBehaviour
                 interr.gameObject.SetActive(false);
             }
         }
+    }
+
+    public Canvas GetMainCanvas()
+    {
+        if (inGameHUD != null)
+        {
+            Canvas c = inGameHUD.GetComponentInParent<Canvas>(true);
+            if (c != null) return c;
+        }
+
+        Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Include);
+        foreach (var c in canvases)
+        {
+            if (c.gameObject.name != "MobileControls" && (inventoryPanel == null || c.gameObject != inventoryPanel) && (endGamePanel == null || c.gameObject != endGamePanel))
+            {
+                return c;
+            }
+        }
+        return FindAnyObjectByType<Canvas>();
     }
 
     private void Start()
@@ -118,6 +138,11 @@ public class UIManager : MonoBehaviour
 
         if (endGamePanel != null) endGamePanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
+
+        if (inGameHUD != null)
+        {
+            inGameHUD.SetActive(true);
+        }
 
         if (mobileControls != null)
         {
@@ -164,10 +189,41 @@ public class UIManager : MonoBehaviour
             if (foundDos != null) mobileDossierBtn = foundDos;
         }
 
-        // ضبط وتثبيت أزرار الجوال (الحقيبة والملفات) في الزاوية العلوية اليمنى بدقة داخل الشاشة
+        // تفريغ مساحة علوية لمنع TouchLookArea من حجب أزرار الواجهة في أعلى الشاشة
+        GameObject touchLookObj = GameObject.Find("TouchLookArea");
+        if (touchLookObj != null)
+        {
+            RectTransform lookRt = touchLookObj.GetComponent<RectTransform>();
+            if (lookRt != null)
+            {
+                // إبعاد منطقة اللمس الخاصة بالكاميرا عن الشريط العلوي للحقيبة والملفات
+                lookRt.offsetMax = new Vector2(lookRt.offsetMax.x, -110f);
+            }
+        }
+
+        // التأكد من وجود inGameHUD
+        if (inGameHUD == null)
+        {
+            inGameHUD = GameObject.Find("InGameHUD");
+        }
+
+        // تحديد الحاوية الشاملة للشاشة (Main Canvas أو UI_Container) لضمان تمركز الأزرار في زاوية الشاشة الحقيقية
+        Transform hudContainer = (GetMainCanvas() != null) ? GetMainCanvas().transform : (uiContainer != null ? uiContainer.transform : null);
+
+        // ضبط وتثبيت زر الحقيبة في الزاوية العلوية اليمنى للشاشة
         if (mobileInventoryBtn != null)
         {
-            mobileInventoryBtn.SetActive(IsTouchDevice());
+            // إزالة أي Canvas فرعي كان مضافاً حتى لا يعلو فوق شاشات الفيديو
+            Canvas oldInvCanvas = mobileInventoryBtn.GetComponent<Canvas>();
+            if (oldInvCanvas != null) Destroy(oldInvCanvas);
+            GraphicRaycaster oldInvRay = mobileInventoryBtn.GetComponent<GraphicRaycaster>();
+            if (oldInvRay != null) Destroy(oldInvRay);
+
+            if (hudContainer != null && mobileInventoryBtn.transform.parent != hudContainer)
+            {
+                mobileInventoryBtn.transform.SetParent(hudContainer, false);
+            }
+            mobileInventoryBtn.SetActive(true);
             mobileInventoryBtn.transform.SetAsLastSibling();
 
             RectTransform invRt = mobileInventoryBtn.GetComponent<RectTransform>();
@@ -176,8 +232,8 @@ public class UIManager : MonoBehaviour
                 invRt.anchorMin = new Vector2(1f, 1f);
                 invRt.anchorMax = new Vector2(1f, 1f);
                 invRt.pivot = new Vector2(1f, 1f);
-                invRt.anchoredPosition = new Vector2(-150f, -40f); // داخل الشاشة تماماً بجانب عداد الأدلة
-                invRt.sizeDelta = new Vector2(75f, 75f);
+                invRt.anchoredPosition = new Vector2(-25f, -25f); // الزاوية العلوية اليمنى للشاشة
+                invRt.sizeDelta = new Vector2(70f, 70f);
                 invRt.localScale = Vector3.one;
             }
 
@@ -187,12 +243,30 @@ public class UIManager : MonoBehaviour
                 invBtnComp.onClick.RemoveAllListeners();
                 invBtnComp.onClick.AddListener(ToggleInventory);
             }
+
+            // إضافة EventTrigger لضمان التقاط أي نقرة بالماوس أو اللمس فوراً
+            var trigger = mobileInventoryBtn.GetComponent<UnityEngine.EventSystems.EventTrigger>();
+            if (trigger == null) trigger = mobileInventoryBtn.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+            trigger.triggers.Clear();
+            var entry = new UnityEngine.EventSystems.EventTrigger.Entry();
+            entry.eventID = UnityEngine.EventSystems.EventTriggerType.PointerClick;
+            entry.callback.AddListener((data) => { ToggleInventory(); });
+            trigger.triggers.Add(entry);
         }
 
-        // إظهار زر ملف المتهمين وتفعيله بشكل دائم لمستخدمي الجوال بجانب الحقيبة
+        // ضبط زر ملف المتهمين بجانب زر الحقيبة في الزاوية العلوية اليمنى
         if (mobileDossierBtn != null)
         {
-            mobileDossierBtn.SetActive(IsTouchDevice());
+            Canvas oldDosCanvas = mobileDossierBtn.GetComponent<Canvas>();
+            if (oldDosCanvas != null) Destroy(oldDosCanvas);
+            GraphicRaycaster oldDosRay = mobileDossierBtn.GetComponent<GraphicRaycaster>();
+            if (oldDosRay != null) Destroy(oldDosRay);
+
+            if (hudContainer != null && mobileDossierBtn.transform.parent != hudContainer)
+            {
+                mobileDossierBtn.transform.SetParent(hudContainer, false);
+            }
+            mobileDossierBtn.SetActive(true);
             mobileDossierBtn.transform.SetAsLastSibling();
 
             RectTransform dosRt = mobileDossierBtn.GetComponent<RectTransform>();
@@ -201,8 +275,8 @@ public class UIManager : MonoBehaviour
                 dosRt.anchorMin = new Vector2(1f, 1f);
                 dosRt.anchorMax = new Vector2(1f, 1f);
                 dosRt.pivot = new Vector2(1f, 1f);
-                dosRt.anchoredPosition = new Vector2(-240f, -40f); // بجانب زر الحقيبة مباشرة
-                dosRt.sizeDelta = new Vector2(75f, 75f);
+                dosRt.anchoredPosition = new Vector2(-105f, -25f); // بجانب زر الحقيبة مباشرة
+                dosRt.sizeDelta = new Vector2(70f, 70f);
                 dosRt.localScale = Vector3.one;
             }
 
@@ -212,13 +286,31 @@ public class UIManager : MonoBehaviour
                 dossierBtnComp.onClick.RemoveAllListeners();
                 dossierBtnComp.onClick.AddListener(OnMobileDossierButtonClicked);
             }
+
+            var trigger = mobileDossierBtn.GetComponent<UnityEngine.EventSystems.EventTrigger>();
+            if (trigger == null) trigger = mobileDossierBtn.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+            trigger.triggers.Clear();
+            var entry = new UnityEngine.EventSystems.EventTrigger.Entry();
+            entry.eventID = UnityEngine.EventSystems.EventTriggerType.PointerClick;
+            entry.callback.AddListener((data) => { OnMobileDossierButtonClicked(); });
+            trigger.triggers.Add(entry);
         }
     }
 
     private void Update()
     {
-        // زر Tab للحقيبة
-        if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
+        // إخفاء فوري وتام لأزرار الحقيبة والملفات أثناء تشغيل أي فيديو أو كاتسين سينمائي
+        bool isCutsceneOrVideo = CaseIntroCutscene.IsPlaying || EvidenceCutsceneManager.IsQuizOrVideoActive;
+        if (isCutsceneOrVideo)
+        {
+            if (inGameHUD != null && inGameHUD.activeSelf) inGameHUD.SetActive(false);
+            if (mobileInventoryBtn != null && mobileInventoryBtn.activeSelf) mobileInventoryBtn.SetActive(false);
+            if (mobileDossierBtn != null && mobileDossierBtn.activeSelf) mobileDossierBtn.SetActive(false);
+            return;
+        }
+
+        // زر Tab أو I للحقيبة
+        if (Keyboard.current != null && (Keyboard.current.tabKey.wasPressedThisFrame || Keyboard.current.iKey.wasPressedThisFrame))
         {
             ToggleInventory();
         }
@@ -306,26 +398,18 @@ public class UIManager : MonoBehaviour
 
         isInventoryOpen = !isInventoryOpen;
 
+        if (inventoryPanel == null)
+        {
+            var found = GameObject.Find("InventoryPanel");
+            if (found != null) inventoryPanel = found;
+        }
+
         if (inventoryPanel != null)
         {
-            Canvas rootCanvas = inventoryPanel.GetComponentInParent<Canvas>(true);
-            if (rootCanvas != null && inventoryPanel.transform.parent != rootCanvas.transform)
+            Canvas mainCanvas = GetMainCanvas();
+            if (mainCanvas != null && inventoryPanel.transform.parent != mainCanvas.transform && inventoryPanel != mainCanvas.gameObject)
             {
-                inventoryPanel.transform.SetParent(rootCanvas.transform, false);
-            }
-
-            // ضمان وجود Canvas فرعي بترتيب رسم عالي جداً لمنع أي حجب
-            Canvas panelCanvas = inventoryPanel.GetComponent<Canvas>();
-            if (panelCanvas == null)
-            {
-                panelCanvas = inventoryPanel.AddComponent<Canvas>();
-            }
-            panelCanvas.overrideSorting = true;
-            panelCanvas.sortingOrder = 999;
-
-            if (inventoryPanel.GetComponent<GraphicRaycaster>() == null)
-            {
-                inventoryPanel.AddComponent<GraphicRaycaster>();
+                inventoryPanel.transform.SetParent(mainCanvas.transform, false);
             }
 
             inventoryPanel.SetActive(isInventoryOpen);
@@ -395,8 +479,8 @@ public class UIManager : MonoBehaviour
                 btnRt.anchorMin = new Vector2(1f, 1f);
                 btnRt.anchorMax = new Vector2(1f, 1f);
                 btnRt.pivot = new Vector2(1f, 1f);
-                btnRt.anchoredPosition = new Vector2(-150f, -40f);
-                btnRt.sizeDelta = new Vector2(75f, 75f);
+                btnRt.anchoredPosition = new Vector2(-30f, -30f);
+                btnRt.sizeDelta = new Vector2(70f, 70f);
                 btnRt.localScale = Vector3.one;
             }
         }
@@ -422,8 +506,8 @@ public class UIManager : MonoBehaviour
                 btnRt.anchorMin = new Vector2(1f, 1f);
                 btnRt.anchorMax = new Vector2(1f, 1f);
                 btnRt.pivot = new Vector2(1f, 1f);
-                btnRt.anchoredPosition = new Vector2(-240f, -40f);
-                btnRt.sizeDelta = new Vector2(75f, 75f);
+                btnRt.anchoredPosition = new Vector2(-115f, -30f);
+                btnRt.sizeDelta = new Vector2(70f, 70f);
                 btnRt.localScale = Vector3.one;
             }
         }
@@ -448,10 +532,28 @@ public class UIManager : MonoBehaviour
                 mobileControls.SetActive(true);
             }
         }
+
+        // عند إخفاء عناصر التحكم (مثل أثناء الفيديوهات أو القوائم)، إخفاء أزرار الحقيبة والملفات أيضاً
+        if (!isActive)
+        {
+            if (mobileInventoryBtn != null) mobileInventoryBtn.SetActive(false);
+            if (mobileDossierBtn != null) mobileDossierBtn.SetActive(false);
+        }
+        else if (isGameActive && !CaseIntroCutscene.IsPlaying && !EvidenceCutsceneManager.IsQuizOrVideoActive)
+        {
+            if (mobileInventoryBtn != null) mobileInventoryBtn.SetActive(true);
+            if (mobileDossierBtn != null) mobileDossierBtn.SetActive(true);
+        }
     }
 
     public void RefreshEvidenceList()
     {
+        if (evidenceListContainer == null && inventoryPanel != null)
+        {
+            var found = inventoryPanel.transform.Find("EvidenceListContainer");
+            if (found != null) evidenceListContainer = found;
+        }
+
         if (evidenceListContainer == null || evidenceItemUIPrefab == null || EvidenceManager.Instance == null)
             return;
 
@@ -484,13 +586,6 @@ public class UIManager : MonoBehaviour
     private void ApplyPolishedInventoryLayout()
     {
         if (inventoryPanel == null) return;
-
-        // التأكد من أن لوحة الحقيبة تتبع الـ Canvas الأساسي مباشرة لتعلو كافة العناصر وتأخذ أبعاد الشاشة الحقيقية
-        Canvas rootCanvas = inventoryPanel.GetComponentInParent<Canvas>(true);
-        if (rootCanvas != null && inventoryPanel.transform.parent != rootCanvas.transform)
-        {
-            inventoryPanel.transform.SetParent(rootCanvas.transform, false);
-        }
 
         // 1. إعادة ضبط حجم وموضع لوحة الحقيبة الرئيسية لتغطي الشاشة بنسب متناسقة وأنيقة
         RectTransform panelRect = inventoryPanel.GetComponent<RectTransform>();
@@ -800,6 +895,11 @@ public class UIManager : MonoBehaviour
     {
         if (notificationBannerText == null) return;
 
+        if (inGameHUD != null && !inGameHUD.activeSelf && isGameActive && !isInventoryOpen)
+        {
+            inGameHUD.SetActive(true);
+        }
+
         if (notificationCoroutine != null)
         {
             StopCoroutine(notificationCoroutine);
@@ -886,11 +986,13 @@ public class UIManager : MonoBehaviour
             rankColor = "#B0BEC5";
         }
 
+        int totalScore = ScoreManager.Instance != null ? ScoreManager.Instance.CurrentScore : (evCount * 20);
+
         if (timeTakenText != null) 
             timeTakenText.text = $"<color=#78909C>INVESTIGATION TIME</color>\n<size=125%><color=#ECEFF1><b>{minutes:00}:{seconds:00}</b></size></color>";
 
         if (evidenceScoreText != null) 
-            evidenceScoreText.text = $"<color=#78909C>EVIDENCE COLLECTED</color>\n<size=125%><color=#ECEFF1><b>{evCount} / 5</b></size></color>";
+            evidenceScoreText.text = $"<color=#78909C>EVIDENCE & SCORE</color>\n<size=120%><color=#ECEFF1><b>{evCount} / 5 CLUES</b></color></size>\n<size=90%><color=#FFD54F><b>SCORE: {totalScore} PTS</b></color></size>";
 
         if (finalGradeText != null) 
             finalGradeText.text = $"<color=#78909C>FINAL EVALUATION</color>\n<size=150%><color={rankColor}><b>RANK {rankBadge}</b></color></size>\n<size=80%><color=#CFD8DC>[{rankTitle}]</color></size>";
@@ -904,14 +1006,20 @@ public class UIManager : MonoBehaviour
             return;
         }
 
-        // البحث عن الـ Canvas الرئيسي
-        Canvas mainCanvas = GetComponentInParent<Canvas>();
-        if (mainCanvas == null) mainCanvas = FindAnyObjectByType<Canvas>();
+        Canvas mainCanvas = GetMainCanvas();
         if (mainCanvas == null) return;
 
         // 1. إنشاء الحاوية الرئيسية لخلفية شاشة النهاية
         endGamePanel = new GameObject("EndGamePanel_Polished", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         endGamePanel.transform.SetParent(mainCanvas.transform, false);
+
+        Canvas panelCanvas = endGamePanel.GetComponent<Canvas>();
+        if (panelCanvas == null) panelCanvas = endGamePanel.AddComponent<Canvas>();
+        panelCanvas.overrideSorting = true;
+        panelCanvas.sortingOrder = 1000;
+
+        if (endGamePanel.GetComponent<GraphicRaycaster>() == null)
+            endGamePanel.AddComponent<GraphicRaycaster>();
 
         RectTransform panelRt = endGamePanel.GetComponent<RectTransform>();
         panelRt.anchorMin = Vector2.zero;
@@ -947,7 +1055,9 @@ public class UIManager : MonoBehaviour
         headerRt.anchoredPosition = new Vector2(0f, -25f);
 
         TextMeshProUGUI headerTmp = headerObj.GetComponent<TextMeshProUGUI>();
-        headerTmp.text = "<color=#00E5FF><b>CASE 13 // RESOLVED</b></color>\n<size=55%><color=#78909C>OFFICIAL FORENSIC BUREAU DEBRIEFING</color></size>";
+        bool isCase2 = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02");
+        string caseTitle = isCase2 ? "CASE 02 // CYPHER VAULT RESOLVED" : "CASE 01 // CASE RESOLVED";
+        headerTmp.text = $"<color=#00E5FF><b>{caseTitle}</b></color>\n<size=55%><color=#78909C>OFFICIAL FORENSIC BUREAU DEBRIEFING</color></size>";
         headerTmp.alignment = TextAlignmentOptions.Center;
         headerTmp.fontSize = 28f;
 
@@ -993,18 +1103,18 @@ public class UIManager : MonoBehaviour
         evidenceScoreText.alignment = TextAlignmentOptions.Center;
         evidenceScoreText.fontSize = 18f;
 
-        // 7. زر الرجوع للقائمة الرئيسية / إنهاء التحقيق (Return Button)
+        // 7. زر العودة للقائمة الرئيسية (Main Menu Button - على اليسار)
         GameObject returnBtnObj = new GameObject("ReturnToMenuBtn", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
         returnBtnObj.transform.SetParent(card.transform, false);
         RectTransform btnRt = returnBtnObj.GetComponent<RectTransform>();
         btnRt.anchorMin = new Vector2(0.5f, 0f);
         btnRt.anchorMax = new Vector2(0.5f, 0f);
         btnRt.pivot = new Vector2(0.5f, 0f);
-        btnRt.sizeDelta = new Vector2(340f, 52f);
-        btnRt.anchoredPosition = new Vector2(0f, 30f);
+        btnRt.sizeDelta = new Vector2(330f, 52f);
+        btnRt.anchoredPosition = new Vector2(-185f, 30f);
 
         Image btnImg = returnBtnObj.GetComponent<Image>();
-        btnImg.color = new Color(0.08f, 0.35f, 0.42f, 0.95f);
+        btnImg.color = new Color(0.12f, 0.16f, 0.22f, 0.98f); // Dark Slate
 
         Button returnBtn = returnBtnObj.GetComponent<Button>();
         returnBtn.onClick.RemoveAllListeners();
@@ -1021,8 +1131,39 @@ public class UIManager : MonoBehaviour
         TextMeshProUGUI labelTmp = btnLabel.GetComponent<TextMeshProUGUI>();
         labelTmp.text = "<b>RETURN TO MAIN MENU</b>";
         labelTmp.alignment = TextAlignmentOptions.Center;
-        labelTmp.fontSize = 18f;
+        labelTmp.fontSize = 17f;
         labelTmp.color = Color.white;
+
+        // 8. زر الانتقال للقضية التالية / القضية 2 (Proceed / Next Case Button - على اليمين)
+        GameObject proceedBtnObj = new GameObject("ProceedCaseBtn", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        proceedBtnObj.transform.SetParent(card.transform, false);
+        RectTransform proceedRt = proceedBtnObj.GetComponent<RectTransform>();
+        proceedRt.anchorMin = new Vector2(0.5f, 0f);
+        proceedRt.anchorMax = new Vector2(0.5f, 0f);
+        proceedRt.pivot = new Vector2(0.5f, 0f);
+        proceedRt.sizeDelta = new Vector2(330f, 52f);
+        proceedRt.anchoredPosition = new Vector2(185f, 30f);
+
+        Image proceedImg = proceedBtnObj.GetComponent<Image>();
+        proceedImg.color = new Color(0.04f, 0.48f, 0.58f, 0.98f); // Cyan Teal Accent
+
+        Button proceedBtn = proceedBtnObj.GetComponent<Button>();
+        proceedBtn.onClick.RemoveAllListeners();
+        proceedBtn.onClick.AddListener(ProceedToNextCase);
+
+        GameObject proceedLabel = new GameObject("ProceedBtnLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
+        proceedLabel.transform.SetParent(proceedBtnObj.transform, false);
+        RectTransform pLabelRt = proceedLabel.GetComponent<RectTransform>();
+        pLabelRt.anchorMin = Vector2.zero;
+        pLabelRt.anchorMax = Vector2.one;
+        pLabelRt.offsetMin = Vector2.zero;
+        pLabelRt.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI pLabelTmp = proceedLabel.GetComponent<TextMeshProUGUI>();
+        pLabelTmp.text = isCase2 ? "<b>REPLAY CASE 02 ➔</b>" : "<b>PROCEED TO CASE 02 ➔</b>";
+        pLabelTmp.alignment = TextAlignmentOptions.Center;
+        pLabelTmp.fontSize = 17f;
+        pLabelTmp.color = Color.white;
     }
 
     private void ApplyPolishedEndGameLayout()
@@ -1047,8 +1188,32 @@ public class UIManager : MonoBehaviour
 
     public void ReturnToMainMenu()
     {
-        // سنقوم بتحميل مشهد القائمة الرئيسية لاحقاً (مثلاً المشهد رقم 0)
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        if (Photon.Pun.PhotonNetwork.IsConnected)
+        {
+            Photon.Pun.PhotonNetwork.LeaveRoom();
+        }
         UnityEngine.SceneManagement.SceneManager.LoadScene(0);
+    }
+
+    public void ProceedToNextCase()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        if (currentScene == "Case01_Main")
+        {
+            PlayerPrefs.SetString("Selected_Case", "Case02_Main");
+            PlayerPrefs.Save();
+            UnityEngine.SceneManagement.SceneManager.LoadScene("Case02_Main");
+        }
+        else
+        {
+            PlayerPrefs.SetString("Selected_Case", "Case02_Main");
+            PlayerPrefs.Save();
+            UnityEngine.SceneManagement.SceneManager.LoadScene("Case02_Main");
+        }
     }
 
     public void ToggleSettings()

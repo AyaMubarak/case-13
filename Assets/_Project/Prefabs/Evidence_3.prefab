@@ -1,0 +1,123 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &8108825139193358207
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 5447241289191196213, guid: e31368e585e0d744998e2f9c7dc1943b, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.9981
+      objectReference: {fileID: 0}
+    - target: {fileID: 5447241289191196213, guid: e31368e585e0d744998e2f9c7dc1943b, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.9499
+      objectReference: {fileID: 0}
+    - target: {fileID: 5447241289191196213, guid: e31368e585e0d744998e2f9c7dc1943b, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0.0083
+      objectReference: {fileID: 0}
+    - target: {fileID: 5447241289191196213, guid: e31368e585e0d744998e2f9c7dc1943b, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.1346
+      objectReference: {fileID: 0}
+    - target: {fileID: -6689036041284674117, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_Name
+      value: Evidence_3
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.005
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.005
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.005
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -6.013
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 9.311
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0.846
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2774220344278030320, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: -6689036041284674117, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1819138596504850649}
+  m_SourcePrefab: {fileID: -5645937942226959685, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+--- !u!1 &6026819783923710660 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -6689036041284674117, guid: dbffcf0070e9c1949b0c9b4f5e5fdc60, type: 3}
+  m_PrefabInstance: {fileID: 8108825139193358207}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1819138596504850649
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6026819783923710660}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e81101867ae7734b901956360ca7726, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Evidence
+  evidenceID: EV_03
+  evidenceName: Broken Syringe Vial
+  type: 0
+  description: Shattered pharmaceutical vial found under the desk stamped with chemical batch codes
+  requiredRole: 1
+  evidenceVideoClip: {fileID: 32900000, guid: 82251dd2327e00f468575e8e9c2f3f75, type: 3}
+  eliminatesSuspectID: SUS_MAYA
+  eliminationFinding: Batch BIO-772 was restricted exclusively to biochemical research staff, clearing Maya Lin.
+  quizQuestion: What unique chemical requisition batch code is engraved on the glass vial?
+  options:
+  - BATCH-BIO-772
+  - BATCH-SEC-104
+  - BATCH-FIN-309
+  - BATCH-AI-990
+  correctOptionIndex: 0
+  promptMessage: Press [E] to Collect Evidence
