@@ -429,8 +429,10 @@ public class SeparateInterrogationManager : MonoBehaviour
 
     private IEnumerator PlayDialogueSequence(SuspectData suspect)
     {
-        suspect.suspectObject.position = chairSeatPosition;
-        suspect.suspectObject.rotation = chairSeatRotation;
+        Vector3 finalChairPos = (suspect.chairTarget != null) ? suspect.chairTarget.position : chairSeatPosition;
+        Quaternion finalChairRot = (suspect.chairTarget != null) ? suspect.chairTarget.rotation : chairSeatRotation;
+        suspect.suspectObject.position = finalChairPos;
+        suspect.suspectObject.rotation = finalChairRot;
 
         AudioSource detectiveVoice = (PlayerProfile.LocalPlayer != null && PlayerProfile.LocalPlayer.gender == DetectiveGender.Female)
             ? suspect.detectiveAskFemale

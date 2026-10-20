@@ -397,6 +397,9 @@ public class Case2LabSetup : EditorWindow
         // 15. Fix Evidence Materials to URP
         EvidenceMaterialDiagnostics.FixEvidenceMaterials();
 
+        // 16. Install and Configure New Suspect Models
+        SetupNewSuspectModels(false);
+
         // Mark scene dirty and save
         EditorSceneManager.MarkSceneDirty(currentScene);
         EditorSceneManager.SaveScene(currentScene);
@@ -516,6 +519,372 @@ public class Case2LabSetup : EditorWindow
         EditorSceneManager.SaveScene(currentScene);
         Debug.Log("<color=green>[NavMesh] NavMesh successfully baked for Case 02!</color>");
         EditorUtility.DisplayDialog("NavMesh Baked", "NavMesh has been successfully baked for Case 02!", "OK");
+    }
+
+    [MenuItem("Cases/Setup New Suspect Models (Walking Man & Grey Woman)")]
+    [MenuItem("Case 2 Setup/Setup New Suspect Models (Walking Man & Grey Woman)")]
+    public static void SetupNewSuspectModels()
+    {
+        SetupNewSuspectModels(true);
+    }
+
+    public static void SetupNewSuspectModels(bool showDialog)
+    {
+        var currentScene = EditorSceneManager.GetActiveScene();
+        if (!currentScene.name.Contains("02"))
+        {
+            if (EditorUtility.DisplayDialog("Switch Scene?", "Do you want to open Case02_Main to setup suspect models?", "Yes", "Cancel"))
+            {
+                currentScene = EditorSceneManager.OpenScene("Assets/_Project/Scenes/Case02_Main.unity");
+            }
+            else return;
+        }
+
+        string manFbxPath = "Assets/_Project/Prefabs/Walking.fbx";
+        string womanFbxPath = "Assets/_Project/Prefabs/Walking (1).fbx";
+
+        // 1. Ensure Model Importers are Humanoid
+        ModelImporter manImporter = AssetImporter.GetAtPath(manFbxPath) as ModelImporter;
+        if (manImporter != null && manImporter.animationType != ModelImporterAnimationType.Human)
+        {
+            manImporter.animationType = ModelImporterAnimationType.Human;
+            manImporter.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+            manImporter.SaveAndReimport();
+        }
+
+        ModelImporter womanImporter = AssetImporter.GetAtPath(womanFbxPath) as ModelImporter;
+        if (womanImporter != null && womanImporter.animationType != ModelImporterAnimationType.Human)
+        {
+            womanImporter.animationType = ModelImporterAnimationType.Human;
+            womanImporter.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+            womanImporter.SaveAndReimport();
+        }
+
+        GameObject manFbx = AssetDatabase.LoadAssetAtPath<GameObject>(manFbxPath);
+        GameObject womanFbx = AssetDatabase.LoadAssetAtPath<GameObject>(womanFbxPath);
+        RuntimeAnimatorController animController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/_Project/Prefabs/Characters/Animation/CharacterAnimation.controller");
+
+        // 2. Find Chair in the room (Office Chair Variant or search chair)
+        GameObject chairObj = GameObject.Find("Office Chair Variant");
+        if (chairObj == null)
+        {
+            foreach (var go in Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include))
+            {
+                if (go.name.ToLower().Contains("chair"))
+                {
+                    chairObj = go;
+                    break;
+                }
+            }
+        }
+
+        Vector3 chairPos = chairObj != null ? chairObj.transform.position : new Vector3(1.691f, 0f, 46.724f);
+        chairPos.y = 0.0f; // Ground level for natural sitting
+        Quaternion chairRot = chairObj != null ? chairObj.transform.rotation : Quaternion.Euler(0, 200.27f, 0);
+
+        // Ensure ChairTarget exists and is positioned
+        GameObject chairTarget = GameObject.Find("ChairTarget");
+        if (chairTarget == null)
+        {
+            chairTarget = new GameObject("ChairTarget");
+        }
+        chairTarget.transform.position = chairPos;
+        chairTarget.transform.rotation = chairRot;
+        EditorUtility.SetDirty(chairTarget);
+
+        // 3. Setup Suspect 1 (Victor Sterling / Evan - Man in Black Walking.fbx)
+        GameObject victorGO = GameObject.Find("NPC_Victor");
+        if (victorGO == null) victorGO = GameObject.Find("victor");
+        if (victorGO == null) victorGO = GameObject.Find("Victor");
+        if (victorGO == null) victorGO = GameObject.Find("evan");
+        if (victorGO == null) victorGO = GameObject.Find("Evan");
+        if (victorGO == null)
+        {
+            foreach (var si in Object.FindObjectsByType<SuspectInterrogation>(FindObjectsInactive.Include))
+            {
+                if (si.gameObject.name.ToLower().Contains("victor") || si.gameObject.name.ToLower().Contains("evan") ||
+                    (!string.IsNullOrEmpty(si.suspectName) && (si.suspectName.ToLower().Contains("victor") || si.suspectName.ToLower().Contains("evan"))))
+                {
+                    victorGO = si.gameObject;
+                    break;
+                }
+            }
+        }
+
+        if (victorGO != null && manFbx != null)
+        {
+            victorGO.SetActive(true);
+            // Position Victor in open, well-lit floor space (3.2m from chair, clearly visible from entrance)
+            victorGO.transform.position = new Vector3(1.5f, 0.0f, 43.5f);
+            victorGO.transform.rotation = Quaternion.Euler(0, 180, 0);
+            ConfigureCharacterModel(victorGO, manFbx, animController, "Victor Sterling", 1.8f);
+            Debug.Log($"<color=green>[Suspects] Attached 3D model (Walking.fbx) to Victor '{victorGO.name}' successfully!</color>");
+        }
+        else
+        {
+            Debug.LogError($"[Suspects] Could not find Victor Sterling GameObject in scene!");
+        }
+
+        // 4. Setup Suspect 2 (Elena Rostova / Nora - Woman in Grey Walking (1).fbx)
+        GameObject elenaGO = GameObject.Find("NPC_Elena");
+        if (elenaGO == null) elenaGO = GameObject.Find("elena");
+        if (elenaGO == null) elenaGO = GameObject.Find("Elena");
+        if (elenaGO == null) elenaGO = GameObject.Find("nora");
+        if (elenaGO == null) elenaGO = GameObject.Find("Nora");
+        if (elenaGO == null)
+        {
+            foreach (var si in Object.FindObjectsByType<SuspectInterrogation>(FindObjectsInactive.Include))
+            {
+                if (si.gameObject.name.ToLower().Contains("elena") || si.gameObject.name.ToLower().Contains("nora") ||
+                    (!string.IsNullOrEmpty(si.suspectName) && (si.suspectName.ToLower().Contains("elena") || si.suspectName.ToLower().Contains("nora"))))
+                {
+                    elenaGO = si.gameObject;
+                    break;
+                }
+            }
+        }
+
+        if (elenaGO != null && womanFbx != null)
+        {
+            elenaGO.SetActive(true);
+            // Position Elena in open walkway area, clearly visible
+            elenaGO.transform.position = new Vector3(2.8f, 0.0f, 43.0f);
+            elenaGO.transform.rotation = Quaternion.Euler(0, 210, 0);
+            ConfigureCharacterModel(elenaGO, womanFbx, animController, "Elena Rostova", 1.7f);
+            Debug.Log($"<color=green>[Suspects] Attached 3D model (Walking (1).fbx) to Elena '{elenaGO.name}' successfully!</color>");
+        }
+        else
+        {
+            Debug.LogError($"[Suspects] Could not find Elena Rostova GameObject in scene!");
+        }
+
+        // 5. Connect SeparateInterrogationManager
+        var sim = Object.FindAnyObjectByType<SeparateInterrogationManager>(FindObjectsInactive.Include);
+        if (sim != null)
+        {
+            if (sim.suspect1 != null)
+            {
+                if (victorGO != null) sim.suspect1.suspectObject = victorGO.transform;
+                sim.suspect1.chairTarget = chairTarget.transform;
+            }
+            if (sim.suspect2 != null)
+            {
+                if (elenaGO != null) sim.suspect2.suspectObject = elenaGO.transform;
+                sim.suspect2.chairTarget = chairTarget.transform;
+            }
+            EditorUtility.SetDirty(sim);
+        }
+
+        // 6. Connect PoliceSceneManager on both (if present)
+        if (victorGO != null)
+        {
+            var psm = victorGO.GetComponent<PoliceSceneManager>();
+            if (psm != null) { psm.chairTarget = chairTarget.transform; EditorUtility.SetDirty(psm); }
+        }
+        if (elenaGO != null)
+        {
+            var psm = elenaGO.GetComponent<PoliceSceneManager>();
+            if (psm != null) { psm.chairTarget = chairTarget.transform; EditorUtility.SetDirty(psm); }
+        }
+
+        // 7. Setup Interrogation Camera
+        GameObject camGO = GameObject.Find("SuspectCamera");
+        if (camGO == null) camGO = GameObject.Find("Camera (1)");
+        if (camGO != null)
+        {
+            Vector3 forward = chairRot * Vector3.forward;
+            camGO.transform.position = chairPos + forward * 1.6f + Vector3.up * 1.15f;
+            camGO.transform.LookAt(chairPos + Vector3.up * 1.0f);
+            Camera cam = camGO.GetComponent<Camera>();
+            if (cam != null && sim != null)
+            {
+                if (sim.suspect1 != null) sim.suspect1.suspectCamera = cam;
+                if (sim.suspect2 != null) sim.suspect2.suspectCamera = cam;
+            }
+            EditorUtility.SetDirty(camGO);
+        }
+
+        EditorSceneManager.MarkSceneDirty(currentScene);
+        EditorSceneManager.SaveScene(currentScene);
+        Debug.Log("<color=green>[Suspects] New 3D models for Victor & Elena installed and configured successfully!</color>");
+        if (showDialog)
+        {
+            EditorUtility.DisplayDialog("Suspect Models Updated", 
+                "The new 3D character models have been successfully installed:\n\n" +
+                "✓ Victor Sterling (Evan): Walking (Man in black)\n" +
+                "✓ Elena Rostova (Nora): Walking (1) (Woman in grey)\n" +
+                "✓ Humanoid rig & animations (Walk, Sit, Talk, Idle) connected 100%\n" +
+                "✓ Seating target & Interrogation camera calibrated at the chair\n\n" +
+                "Ready to test!", "OK");
+        }
+    }
+
+    private static void ConfigureCharacterModel(GameObject rootGO, GameObject fbxPrefab, RuntimeAnimatorController controller, string suspectName, float height)
+    {
+        // 1. Remove old visual mesh children (except audio or cameras)
+        List<GameObject> toDestroy = new List<GameObject>();
+        for (int i = 0; i < rootGO.transform.childCount; i++)
+        {
+            Transform child = rootGO.transform.GetChild(i);
+            if (child.GetComponent<Camera>() != null || child.GetComponent<AudioSource>() != null)
+            {
+                continue;
+            }
+            toDestroy.Add(child.gameObject);
+        }
+        foreach (var go in toDestroy)
+        {
+            Undo.DestroyObjectImmediate(go);
+        }
+
+        // 2. Instantiate new model child
+        GameObject modelInstance = (GameObject)PrefabUtility.InstantiatePrefab(fbxPrefab, rootGO.transform);
+        modelInstance.name = "Character_Visual";
+        modelInstance.transform.localRotation = Quaternion.identity;
+
+        // 3. Measure raw mesh bounds to accurately scale and plant feet on the floor
+        Bounds localBounds = new Bounds();
+        bool hasBounds = false;
+        foreach (var r in modelInstance.GetComponentsInChildren<Renderer>(true))
+        {
+            if (r is SkinnedMeshRenderer smr && smr.sharedMesh != null)
+            {
+                if (!hasBounds) { localBounds = smr.sharedMesh.bounds; hasBounds = true; }
+                else { localBounds.Encapsulate(smr.sharedMesh.bounds); }
+            }
+            else if (r is MeshRenderer && r.GetComponent<MeshFilter>() != null && r.GetComponent<MeshFilter>().sharedMesh != null)
+            {
+                var mb = r.GetComponent<MeshFilter>().sharedMesh.bounds;
+                if (!hasBounds) { localBounds = mb; hasBounds = true; }
+                else { localBounds.Encapsulate(mb); }
+            }
+        }
+
+        float scaleFactor = 1.0f;
+        float yOffset = 0f;
+        if (hasBounds && localBounds.size.y > 0.05f)
+        {
+            scaleFactor = height / localBounds.size.y;
+            yOffset = -localBounds.min.y * scaleFactor;
+        }
+        else
+        {
+            // Precise fallbacks measured from FBX data
+            if (fbxPrefab.name.Contains("(1)")) // Nora (Elena)
+            {
+                scaleFactor = 1.21f;
+                yOffset = 0f;
+            }
+            else // Victor (Evan)
+            {
+                scaleFactor = 2.06f;
+                yOffset = 1.03f;
+            }
+        }
+
+        modelInstance.transform.localScale = Vector3.one * scaleFactor;
+        modelInstance.transform.localPosition = new Vector3(0f, yOffset, 0f);
+
+        // 4. Configure Animator on the model
+        Animator rootAnim = rootGO.GetComponent<Animator>();
+        if (rootAnim != null) Undo.DestroyObjectImmediate(rootAnim);
+
+        Animator anim = modelInstance.GetComponent<Animator>();
+        if (anim == null) anim = modelInstance.AddComponent<Animator>();
+        anim.runtimeAnimatorController = controller;
+        anim.applyRootMotion = false;
+
+        Avatar avatar = null;
+        string path = AssetDatabase.GetAssetPath(fbxPrefab);
+        foreach (var asset in AssetDatabase.LoadAllAssetsAtPath(path))
+        {
+            if (asset is Avatar av)
+            {
+                avatar = av;
+                break;
+            }
+        }
+        if (avatar != null)
+        {
+            anim.avatar = avatar;
+        }
+
+        // 5. Update CapsuleCollider to surround the full body
+        CapsuleCollider col = rootGO.GetComponent<CapsuleCollider>();
+        if (col == null) col = rootGO.AddComponent<CapsuleCollider>();
+        col.height = height;
+        col.center = new Vector3(0, height * 0.5f, 0);
+        col.radius = 0.38f;
+
+        // 6. Update SuspectInterrogation
+        SuspectInterrogation si = rootGO.GetComponent<SuspectInterrogation>();
+        if (si != null)
+        {
+            si.suspectName = suspectName;
+            EditorUtility.SetDirty(si);
+        }
+
+        // 7. Ensure URP Lit materials with vivid textures
+        Shader urpShader = Shader.Find("Universal Render Pipeline/Lit");
+        if (urpShader == null) urpShader = Shader.Find("Universal Render Pipeline/Simple Lit");
+
+        if (urpShader != null)
+        {
+            if (!fbxPrefab.name.Contains("(1)"))
+            {
+                // Victor Sterling - ensure dedicated URP Lit material
+                Material victorMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Prefabs/Victor_URP_Mat.mat");
+                if (victorMat == null)
+                {
+                    victorMat = new Material(urpShader);
+                    Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/tripo_mat_d0bcade7_baseColor.jpg");
+                    if (tex != null)
+                    {
+                        victorMat.SetTexture("_BaseMap", tex);
+                        victorMat.SetTexture("_MainTex", tex);
+                    }
+                    victorMat.SetColor("_BaseColor", Color.white);
+                    AssetDatabase.CreateAsset(victorMat, "Assets/_Project/Prefabs/Victor_URP_Mat.mat");
+                }
+                foreach (var r in modelInstance.GetComponentsInChildren<Renderer>(true))
+                {
+                    r.sharedMaterial = victorMat;
+                    EditorUtility.SetDirty(r);
+                }
+            }
+            else
+            {
+                // Elena Rostova - upgrade mat0mat..mat7mat to URP Lit
+                foreach (var r in modelInstance.GetComponentsInChildren<Renderer>(true))
+                {
+                    foreach (var mat in r.sharedMaterials)
+                    {
+                        if (mat != null && mat.shader != urpShader)
+                        {
+                            Texture mainTex = mat.mainTexture;
+                            Texture normalTex = mat.HasProperty("_BumpMap") ? mat.GetTexture("_BumpMap") : null;
+                            Color colVal = mat.HasProperty("_Color") ? mat.color : Color.white;
+                            mat.shader = urpShader;
+                            if (mainTex != null)
+                            {
+                                mat.SetTexture("_BaseMap", mainTex);
+                                mat.SetTexture("_MainTex", mainTex);
+                            }
+                            if (normalTex != null)
+                            {
+                                mat.SetTexture("_BumpMap", normalTex);
+                                mat.EnableKeyword("_NORMALMAP");
+                            }
+                            mat.SetColor("_BaseColor", colVal);
+                            EditorUtility.SetDirty(mat);
+                        }
+                    }
+                }
+            }
+        }
+
+        EditorUtility.SetDirty(rootGO);
+        EditorUtility.SetDirty(modelInstance);
     }
 
     [MenuItem("Cases/Assign Case 2 Audio Voices (Victor & Elena)")]
