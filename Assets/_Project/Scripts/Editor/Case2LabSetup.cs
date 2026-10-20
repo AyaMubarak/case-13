@@ -281,13 +281,13 @@ public class Case2LabSetup : EditorWindow
             {
                 interrogationChair = (GameObject)PrefabUtility.InstantiatePrefab(chairPrefab, propsContainer);
                 interrogationChair.name = "Interrogation_Lab_Chair";
-                interrogationChair.transform.localPosition = new Vector3(4.2f, 0.0f, 33.2f);
-                interrogationChair.transform.localRotation = Quaternion.Euler(0, 0, 0);
+                interrogationChair.transform.localPosition = new Vector3(4.2f, 0.0f, 33.25f);
+                interrogationChair.transform.localRotation = Quaternion.Euler(0, -90f, 0); // Backrest South (-Z), Seat North (+Z towards desk)
 
                 GameObject investigatorChair = (GameObject)PrefabUtility.InstantiatePrefab(chairPrefab, propsContainer);
                 investigatorChair.name = "Investigator_Desk_Chair";
-                investigatorChair.transform.localPosition = new Vector3(4.2f, 0.0f, 34.8f);
-                investigatorChair.transform.localRotation = Quaternion.Euler(0, 180, 0);
+                investigatorChair.transform.localPosition = new Vector3(4.2f, 0.0f, 34.75f);
+                investigatorChair.transform.localRotation = Quaternion.Euler(0, 90f, 0); // Backrest North (+Z), Seat South (-Z towards desk)
             }
         }
 
@@ -301,12 +301,13 @@ public class Case2LabSetup : EditorWindow
 
         if (interrogationChair != null)
         {
-            chairTargetGO.transform.position = interrogationChair.transform.position + new Vector3(0, 0.45f, 0);
-            chairTargetGO.transform.rotation = interrogationChair.transform.rotation;
+            chairTargetGO.transform.position = new Vector3(4.2f, 0.0f, 33.25f);
+            chairTargetGO.transform.rotation = Quaternion.Euler(0, 0, 0); // Humanoid faces North (+Z towards desk)
         }
         else
         {
-            chairTargetGO.transform.position = new Vector3(4.2f, 0.45f, 33.2f);
+            chairTargetGO.transform.position = new Vector3(4.2f, 0.0f, 33.25f);
+            chairTargetGO.transform.rotation = Quaternion.Euler(0, 0, 0);
         }
 
         var sim = Object.FindAnyObjectByType<SeparateInterrogationManager>(FindObjectsInactive.Include);
@@ -564,8 +565,10 @@ public class Case2LabSetup : EditorWindow
         GameObject womanFbx = AssetDatabase.LoadAssetAtPath<GameObject>(womanFbxPath);
         RuntimeAnimatorController animController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/_Project/Prefabs/Characters/Animation/CharacterAnimation.controller");
 
-        // 2. Find Chair in the room (Office Chair Variant or search chair)
-        GameObject chairObj = GameObject.Find("Office Chair Variant");
+        // 2. Find Chair in the room (Interrogation_Lab_Chair or ChairTarget)
+        GameObject chairObj = GameObject.Find("Interrogation_Lab_Chair");
+        if (chairObj == null) chairObj = GameObject.Find("ChairTarget");
+        if (chairObj == null) chairObj = GameObject.Find("Office Chair Variant");
         if (chairObj == null)
         {
             foreach (var go in Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include))
@@ -578,18 +581,22 @@ public class Case2LabSetup : EditorWindow
             }
         }
 
-        Vector3 chairPos = chairObj != null ? chairObj.transform.position : new Vector3(1.691f, 0f, 46.724f);
-        chairPos.y = 0.0f; // Ground level for natural sitting
-        Quaternion chairRot = chairObj != null ? chairObj.transform.rotation : Quaternion.Euler(0, 200.27f, 0);
+        Vector3 chairPos = new Vector3(4.2f, 0.0f, 33.25f);
+        if (chairObj != null)
+        {
+            chairObj.transform.position = chairPos;
+            chairObj.transform.rotation = Quaternion.Euler(0, -90f, 0); // Backrest South (-Z), Seat North (+Z)
+            EditorUtility.SetDirty(chairObj);
+        }
 
-        // Ensure ChairTarget exists and is positioned
+        // Ensure ChairTarget exists and is positioned accurately
         GameObject chairTarget = GameObject.Find("ChairTarget");
         if (chairTarget == null)
         {
             chairTarget = new GameObject("ChairTarget");
         }
         chairTarget.transform.position = chairPos;
-        chairTarget.transform.rotation = chairRot;
+        chairTarget.transform.rotation = Quaternion.Euler(0, 0, 0); // Suspect faces North (+Z towards desk)
         EditorUtility.SetDirty(chairTarget);
 
         // 3. Setup Suspect 1 (Victor Sterling / Evan - Man in Black Walking.fbx)
@@ -611,18 +618,22 @@ public class Case2LabSetup : EditorWindow
             }
         }
 
-        if (victorGO != null && manFbx != null)
+        if (victorGO == null)
         {
-            victorGO.SetActive(true);
-            // Position Victor in open, well-lit floor space (3.2m from chair, clearly visible from entrance)
-            victorGO.transform.position = new Vector3(1.5f, 0.0f, 43.5f);
-            victorGO.transform.rotation = Quaternion.Euler(0, 180, 0);
-            ConfigureCharacterModel(victorGO, manFbx, animController, "Victor Sterling", 1.8f);
-            Debug.Log($"<color=green>[Suspects] Attached 3D model (Walking.fbx) to Victor '{victorGO.name}' successfully!</color>");
+            victorGO = new GameObject("NPC_Victor");
+            victorGO.AddComponent<SuspectInterrogation>();
         }
-        else
+
+        if (victorGO != null)
         {
-            Debug.LogError($"[Suspects] Could not find Victor Sterling GameObject in scene!");
+            victorGO.name = "NPC_Victor";
+            victorGO.SetActive(false); // Hidden until 5 evidences are collected
+            // Position Victor firmly on open floor walkway (clear of workbench table, beside Elena)
+            victorGO.transform.position = new Vector3(2.0f, 0.0f, 33.8f);
+            victorGO.transform.rotation = Quaternion.Euler(0, 150, 0);
+            victorGO.transform.localScale = Vector3.one;
+            ConfigureCharacterModel(victorGO, manFbx, animController, "Victor Sterling", 1.8f);
+            Debug.Log($"<color=green>[Suspects] Configured Victor '{victorGO.name}' on open floor at (2.0, 0.0, 33.8) successfully!</color>");
         }
 
         // 4. Setup Suspect 2 (Elena Rostova / Nora - Woman in Grey Walking (1).fbx)
@@ -644,47 +655,65 @@ public class Case2LabSetup : EditorWindow
             }
         }
 
-        if (elenaGO != null && womanFbx != null)
+        if (elenaGO == null)
         {
-            elenaGO.SetActive(true);
-            // Position Elena in open walkway area, clearly visible
-            elenaGO.transform.position = new Vector3(2.8f, 0.0f, 43.0f);
-            elenaGO.transform.rotation = Quaternion.Euler(0, 210, 0);
-            ConfigureCharacterModel(elenaGO, womanFbx, animController, "Elena Rostova", 1.7f);
-            Debug.Log($"<color=green>[Suspects] Attached 3D model (Walking (1).fbx) to Elena '{elenaGO.name}' successfully!</color>");
+            elenaGO = new GameObject("NPC_Elena");
+            elenaGO.AddComponent<SuspectInterrogation>();
         }
-        else
+
+        if (elenaGO != null)
         {
-            Debug.LogError($"[Suspects] Could not find Elena Rostova GameObject in scene!");
+            elenaGO.name = "NPC_Elena";
+            elenaGO.SetActive(false); // Hidden until 5 evidences are collected
+            // Position Elena firmly on open floor walkway, in clear direct view
+            elenaGO.transform.position = new Vector3(2.6f, 0.0f, 34.5f);
+            elenaGO.transform.rotation = Quaternion.Euler(0, 210, 0);
+            elenaGO.transform.localScale = Vector3.one;
+            ConfigureCharacterModel(elenaGO, womanFbx, animController, "Elena Rostova", 1.7f);
+            Debug.Log($"<color=green>[Suspects] Configured Elena '{elenaGO.name}' on open floor at (2.6, 0.0, 34.5) successfully!</color>");
         }
 
         // 5. Connect SeparateInterrogationManager
         var sim = Object.FindAnyObjectByType<SeparateInterrogationManager>(FindObjectsInactive.Include);
         if (sim != null)
         {
+            sim.keepSuspectsVisibleInitially = false; // Must be hidden until all 5 evidences are collected
             if (sim.suspect1 != null)
             {
                 if (victorGO != null) sim.suspect1.suspectObject = victorGO.transform;
                 sim.suspect1.chairTarget = chairTarget.transform;
+                sim.suspect1.suspectName = "Victor Sterling";
             }
             if (sim.suspect2 != null)
             {
                 if (elenaGO != null) sim.suspect2.suspectObject = elenaGO.transform;
                 sim.suspect2.chairTarget = chairTarget.transform;
+                sim.suspect2.suspectName = "Elena Rostova";
             }
             EditorUtility.SetDirty(sim);
         }
 
         // 6. Connect PoliceSceneManager on both (if present)
+        var playerMovement = Object.FindAnyObjectByType<PlayerMovement>(FindObjectsInactive.Include);
         if (victorGO != null)
         {
             var psm = victorGO.GetComponent<PoliceSceneManager>();
-            if (psm != null) { psm.chairTarget = chairTarget.transform; EditorUtility.SetDirty(psm); }
+            if (psm != null) 
+            { 
+                psm.chairTarget = chairTarget.transform; 
+                if (playerMovement != null) psm.investigator = playerMovement.transform;
+                EditorUtility.SetDirty(psm); 
+            }
         }
         if (elenaGO != null)
         {
             var psm = elenaGO.GetComponent<PoliceSceneManager>();
-            if (psm != null) { psm.chairTarget = chairTarget.transform; EditorUtility.SetDirty(psm); }
+            if (psm != null) 
+            { 
+                psm.chairTarget = chairTarget.transform; 
+                if (playerMovement != null) psm.investigator = playerMovement.transform;
+                EditorUtility.SetDirty(psm); 
+            }
         }
 
         // 7. Setup Interrogation Camera
@@ -692,9 +721,9 @@ public class Case2LabSetup : EditorWindow
         if (camGO == null) camGO = GameObject.Find("Camera (1)");
         if (camGO != null)
         {
-            Vector3 forward = chairRot * Vector3.forward;
-            camGO.transform.position = chairPos + forward * 1.6f + Vector3.up * 1.15f;
-            camGO.transform.LookAt(chairPos + Vector3.up * 1.0f);
+            // Position camera across the desk facing the suspect
+            camGO.transform.position = new Vector3(4.45f, 1.25f, 34.75f);
+            camGO.transform.LookAt(new Vector3(4.2f, 0.95f, 33.25f));
             Camera cam = camGO.GetComponent<Camera>();
             if (cam != null && sim != null)
             {
@@ -737,10 +766,29 @@ public class Case2LabSetup : EditorWindow
             Undo.DestroyObjectImmediate(go);
         }
 
+        // 1. Ensure root is clean
+        rootGO.transform.localScale = Vector3.one;
+
         // 2. Instantiate new model child
         GameObject modelInstance = (GameObject)PrefabUtility.InstantiatePrefab(fbxPrefab, rootGO.transform);
         modelInstance.name = "Character_Visual";
         modelInstance.transform.localRotation = Quaternion.identity;
+
+        // Fallback to validated character model if prefab has no renderers
+        if (modelInstance.GetComponentsInChildren<Renderer>(true).Length == 0)
+        {
+            Undo.DestroyObjectImmediate(modelInstance);
+            string fallbackPath = fbxPrefab.name.Contains("(1)")
+                ? "Assets/_Project/Prefabs/Characters/Animation/nora/Walking.fbx"
+                : "Assets/_Project/Prefabs/Characters/Animation/evan/Walking.fbx";
+            GameObject fallbackPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(fallbackPath);
+            if (fallbackPrefab != null)
+            {
+                modelInstance = (GameObject)PrefabUtility.InstantiatePrefab(fallbackPrefab, rootGO.transform);
+                modelInstance.name = "Character_Visual";
+                fbxPrefab = fallbackPrefab;
+            }
+        }
 
         // 3. Measure raw mesh bounds to accurately scale and plant feet on the floor
         Bounds localBounds = new Bounds();
@@ -762,28 +810,44 @@ public class Case2LabSetup : EditorWindow
 
         float scaleFactor = 1.0f;
         float yOffset = 0f;
-        if (hasBounds && localBounds.size.y > 0.05f)
+        if (hasBounds && localBounds.size.y > 0.0001f)
         {
             scaleFactor = height / localBounds.size.y;
             yOffset = -localBounds.min.y * scaleFactor;
         }
         else
         {
-            // Precise fallbacks measured from FBX data
-            if (fbxPrefab.name.Contains("(1)")) // Nora (Elena)
-            {
-                scaleFactor = 1.21f;
-                yOffset = 0f;
-            }
-            else // Victor (Evan)
-            {
-                scaleFactor = 2.06f;
-                yOffset = 1.03f;
-            }
+            scaleFactor = 1.0f;
+            yOffset = 0f;
         }
 
         modelInstance.transform.localScale = Vector3.one * scaleFactor;
         modelInstance.transform.localPosition = new Vector3(0f, yOffset, 0f);
+
+        // Double-check world bounds and strictly plant feet on the floor
+        Bounds worldBounds = new Bounds();
+        bool hasWorldBounds = false;
+        foreach (var r in modelInstance.GetComponentsInChildren<Renderer>(true))
+        {
+            if (!hasWorldBounds) { worldBounds = r.bounds; hasWorldBounds = true; }
+            else { worldBounds.Encapsulate(r.bounds); }
+        }
+
+        if (hasWorldBounds && worldBounds.size.y > 0.01f)
+        {
+            float curH = worldBounds.size.y;
+            if (Mathf.Abs(curH - height) > 0.15f)
+            {
+                float adj = height / curH;
+                scaleFactor *= adj;
+                modelInstance.transform.localScale = Vector3.one * scaleFactor;
+            }
+
+            // Always ensure bottom of shoes touches floor level (rootGO.transform.position.y)
+            float floorLevel = rootGO.transform.position.y;
+            float bottomOffset = worldBounds.min.y - floorLevel;
+            modelInstance.transform.position -= new Vector3(0f, bottomOffset, 0f);
+        }
 
         // 4. Configure Animator on the model
         Animator rootAnim = rootGO.GetComponent<Animator>();
@@ -824,7 +888,7 @@ public class Case2LabSetup : EditorWindow
             EditorUtility.SetDirty(si);
         }
 
-        // 7. Ensure URP Lit materials with vivid textures
+        // 7. Ensure Universal Render Pipeline / Lit materials with vivid textures
         Shader urpShader = Shader.Find("Universal Render Pipeline/Lit");
         if (urpShader == null) urpShader = Shader.Find("Universal Render Pipeline/Simple Lit");
 
@@ -832,59 +896,104 @@ public class Case2LabSetup : EditorWindow
         {
             if (!fbxPrefab.name.Contains("(1)"))
             {
-                // Victor Sterling - ensure dedicated URP Lit material
-                Material victorMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Prefabs/Victor_URP_Mat.mat");
-                if (victorMat == null)
-                {
-                    victorMat = new Material(urpShader);
-                    Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/tripo_mat_d0bcade7_baseColor.jpg");
-                    if (tex != null)
-                    {
-                        victorMat.SetTexture("_BaseMap", tex);
-                        victorMat.SetTexture("_MainTex", tex);
-                    }
-                    victorMat.SetColor("_BaseColor", Color.white);
-                    AssetDatabase.CreateAsset(victorMat, "Assets/_Project/Prefabs/Victor_URP_Mat.mat");
-                }
-                foreach (var r in modelInstance.GetComponentsInChildren<Renderer>(true))
-                {
-                    r.sharedMaterial = victorMat;
-                    EditorUtility.SetDirty(r);
-                }
+                SetupVictorMaterials(modelInstance, urpShader);
             }
             else
             {
-                // Elena Rostova - upgrade mat0mat..mat7mat to URP Lit
-                foreach (var r in modelInstance.GetComponentsInChildren<Renderer>(true))
-                {
-                    foreach (var mat in r.sharedMaterials)
-                    {
-                        if (mat != null && mat.shader != urpShader)
-                        {
-                            Texture mainTex = mat.mainTexture;
-                            Texture normalTex = mat.HasProperty("_BumpMap") ? mat.GetTexture("_BumpMap") : null;
-                            Color colVal = mat.HasProperty("_Color") ? mat.color : Color.white;
-                            mat.shader = urpShader;
-                            if (mainTex != null)
-                            {
-                                mat.SetTexture("_BaseMap", mainTex);
-                                mat.SetTexture("_MainTex", mainTex);
-                            }
-                            if (normalTex != null)
-                            {
-                                mat.SetTexture("_BumpMap", normalTex);
-                                mat.EnableKeyword("_NORMALMAP");
-                            }
-                            mat.SetColor("_BaseColor", colVal);
-                            EditorUtility.SetDirty(mat);
-                        }
-                    }
-                }
+                SetupElenaMaterials(modelInstance, urpShader);
             }
         }
 
         EditorUtility.SetDirty(rootGO);
         EditorUtility.SetDirty(modelInstance);
+    }
+
+    private static void SetupVictorMaterials(GameObject modelInstance, Shader urpShader)
+    {
+        Material victorMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Prefabs/Victor_URP_Mat.mat");
+        if (victorMat == null)
+        {
+            victorMat = new Material(urpShader);
+            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/tripo_mat_d0bcade7_baseColor.jpg");
+            if (tex != null)
+            {
+                victorMat.SetTexture("_BaseMap", tex);
+                victorMat.SetTexture("_MainTex", tex);
+            }
+            victorMat.SetColor("_BaseColor", Color.white);
+            AssetDatabase.CreateAsset(victorMat, "Assets/_Project/Prefabs/Victor_URP_Mat.mat");
+        }
+        else
+        {
+            victorMat.shader = urpShader;
+            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/tripo_mat_d0bcade7_baseColor.jpg");
+            if (tex != null)
+            {
+                victorMat.SetTexture("_BaseMap", tex);
+                victorMat.SetTexture("_MainTex", tex);
+            }
+            victorMat.SetColor("_BaseColor", Color.white);
+            EditorUtility.SetDirty(victorMat);
+        }
+
+        foreach (var r in modelInstance.GetComponentsInChildren<Renderer>(true))
+        {
+            r.sharedMaterial = victorMat;
+            EditorUtility.SetDirty(r);
+        }
+    }
+
+    private static void SetupElenaMaterials(GameObject modelInstance, Shader urpShader)
+    {
+        Texture2D bodyTex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/AvatarBody_baseColor.jpg");
+        Texture2D bodyNorm = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/AvatarBody_normal.png");
+        Texture2D headTex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/AvatarHead_baseColor.jpg");
+        Texture2D headNorm = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/AvatarHead_normal.png");
+        Texture2D outfitTex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/outfit_baseColor.jpg");
+        Texture2D outfitNorm = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/outfit_normal.png");
+        Texture2D hairTex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/haircut_baseColor.png");
+        Texture2D hairNorm = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/haircut_normal.png");
+        Texture2D glassesTex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/glasses_baseColor.png");
+        Texture2D teethTex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/AvatarTeethLower_baseColor.jpg");
+        Texture2D eyeTex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Prefabs/AvatarLeftEyeball_baseColor.jpg");
+
+        foreach (var r in modelInstance.GetComponentsInChildren<Renderer>(true))
+        {
+            Material[] mats = r.sharedMaterials;
+            for (int i = 0; i < mats.Length; i++)
+            {
+                Material m = mats[i];
+                if (m == null) continue;
+                string mName = m.name.ToLower();
+                m.shader = urpShader;
+                m.SetColor("_BaseColor", Color.white);
+
+                Texture2D albedo = null;
+                Texture2D normal = null;
+
+                if (mName.Contains("outfit") || mName.Contains("mat0") || mName.Contains("mat5")) { albedo = outfitTex; normal = outfitNorm; }
+                else if (mName.Contains("body") || mName.Contains("mat3")) { albedo = bodyTex; normal = bodyNorm; }
+                else if (mName.Contains("head") || mName.Contains("mat2")) { albedo = headTex; normal = headNorm; }
+                else if (mName.Contains("hair") || mName.Contains("mat4")) { albedo = hairTex; normal = hairNorm; }
+                else if (mName.Contains("glass") || mName.Contains("mat6")) { albedo = glassesTex; }
+                else if (mName.Contains("teeth") || mName.Contains("mat7")) { albedo = teethTex; }
+                else if (mName.Contains("eye") || mName.Contains("mat1")) { albedo = eyeTex; }
+                else if (outfitTex != null) { albedo = outfitTex; normal = outfitNorm; }
+
+                if (albedo != null)
+                {
+                    m.SetTexture("_BaseMap", albedo);
+                    m.SetTexture("_MainTex", albedo);
+                }
+                if (normal != null)
+                {
+                    m.SetTexture("_BumpMap", normal);
+                    m.EnableKeyword("_NORMALMAP");
+                }
+                EditorUtility.SetDirty(m);
+            }
+            r.sharedMaterials = mats;
+        }
     }
 
     [MenuItem("Cases/Assign Case 2 Audio Voices (Victor & Elena)")]

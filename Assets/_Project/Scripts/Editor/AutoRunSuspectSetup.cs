@@ -15,14 +15,36 @@ public static class AutoRunSuspectSetup
         if (!activeScene.name.Contains("02")) return;
 
         GameObject victor = GameObject.Find("NPC_Victor");
-        if (victor != null)
+        bool needsSetup = false;
+
+        GameObject chair = GameObject.Find("Interrogation_Lab_Chair");
+        if (chair != null && Mathf.Abs(chair.transform.eulerAngles.y - 270f) > 5f)
+        {
+            needsSetup = true;
+        }
+
+        if (victor == null)
+        {
+            needsSetup = true;
+        }
+        else
         {
             Transform visual = victor.transform.Find("Character_Visual");
             if (visual == null)
             {
-                Debug.Log("<color=cyan>[AutoSetup] NPC_Victor has no 3D mesh. Running SetupNewSuspectModels...</color>");
-                Case2LabSetup.SetupNewSuspectModels(false);
+                needsSetup = true;
             }
+            else if (victor.transform.position.x < 1.8f || victor.activeSelf || visual.localScale.x < 0.005f || visual.localScale.x > 50f)
+            {
+                // Old position on top of the workbench table or currently active at startup
+                needsSetup = true;
+            }
+        }
+
+        if (needsSetup)
+        {
+            Debug.Log("<color=cyan>[AutoSetup] Calibrating and setting up Suspect Models for Case 02...</color>");
+            Case2LabSetup.SetupNewSuspectModels(false);
         }
     }
 }
