@@ -165,7 +165,8 @@ public class CaseDossierManager : MonoBehaviour
             // مطابقة إما بالـ ID أو بالاسم (مثل SUS_SARAH أو SARAH)
             if (sID == targetKey || sName.Contains(targetKey) || targetKey.Contains(sName))
             {
-                if (sID == "SUS_NORA" || sID == "SUS_EVAN" || sName.Contains("NORA") || sName.Contains("EVAN"))
+                if (sID == "SUS_NORA" || sID == "SUS_EVAN" || sID == "SUS_VICTOR" || sID == "SUS_ELENA" ||
+                    sName.Contains("NORA") || sName.Contains("EVAN") || sName.Contains("VICTOR") || sName.Contains("ELENA"))
                 {
                     Debug.LogWarning($"[SECURITY] Cannot eliminate core suspect {s.suspectName}!");
                     return;
@@ -489,10 +490,14 @@ public class CaseDossierManager : MonoBehaviour
     {
         if (currentSelectedSuspect != null)
         {
-            // حماية صارمة لمنع استبعاد إيفان ونورا بأي شكل
-            if (currentSelectedSuspect.suspectID == "SUS_NORA" || currentSelectedSuspect.suspectID == "SUS_EVAN")
+            // حماية صارمة لمنع استبعاد المشتبه بهم الأساسيين (إيفان ونورا في القضية 1، وفيكتور وإيلينا في القضية 2)
+            string selID = currentSelectedSuspect.suspectID ?? "";
+            string selName = currentSelectedSuspect.suspectName ?? "";
+            if (selID == "SUS_NORA" || selID == "SUS_EVAN" || selID == "SUS_VICTOR" || selID == "SUS_ELENA" ||
+                selName.ToUpper().Contains("NORA") || selName.ToUpper().Contains("EVAN") ||
+                selName.ToUpper().Contains("VICTOR") || selName.ToUpper().Contains("ELENA"))
             {
-                Debug.LogWarning("[SECURITY] Cannot eliminate Nora or Evan! They are the core suspects.");
+                Debug.LogWarning($"[SECURITY] Cannot eliminate core suspect {selName}! They are part of the final confrontation.");
                 CloseDetailsPanel();
                 return;
             }
@@ -545,7 +550,7 @@ public class CaseDossierManager : MonoBehaviour
 
     private void UnlockFinalConfrontation()
     {
-        Debug.Log("<color=green>[CASE READY] All 5 evidences collected! Final confrontation unlocked between Nora and Evan.</color>");
+        Debug.Log("<color=green>[CASE READY] All 5 evidences collected! Final confrontation unlocked between the 2 remaining suspects.</color>");
         if (interrogationPromptUI != null) interrogationPromptUI.SetActive(true);
         if (confrontBtn != null)
         {

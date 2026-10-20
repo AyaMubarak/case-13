@@ -5,8 +5,8 @@ using UnityEngine.UI;
 public class PlayerInteraction : MonoBehaviour
 {
     [Header("Interaction Settings")]
-    [Tooltip("نصف قطر دائرة التفاعل حول اللاعب (مسافة قريبة ومتوازنة)")]
-    public float interactionRadius = 1.35f;
+    [Tooltip("نصف قطر دائرة التفاعل حول اللاعب")]
+    public float interactionRadius = 2.2f;
 
     [Header("Mobile Controls UI")]
     public GameObject mobileInteractBtn;
@@ -15,8 +15,8 @@ public class PlayerInteraction : MonoBehaviour
 
     private void Start()
     {
-        // ضبط مسافة التفاعل إلى مسافة معقولة وقريبة (1.35m) تمنع التفاعل من بعيد وتمنع اختفاء التنبيه السريع
-        interactionRadius = 1.35f;
+        // مسافة تفاعل مريحة (2.2m) تمكن اللاعب من التفاعل مع الأدلة الموضوعة على المكاتب والطاولات
+        interactionRadius = 2.2f;
 
         if (mobileInteractBtn != null)
         {

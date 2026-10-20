@@ -83,8 +83,8 @@ MonoBehaviour:
   description: Encrypted audio memo captured by the emergency security mic seconds before the vault breached
   requiredRole: 3
   evidenceVideoClip: {fileID: 32900000, guid: dadbec3790e18bc43b0d6ed56f48eccd, type: 3}
-  eliminatesSuspectID: SUS_VICTOR
-  eliminationFinding: Spectrogram analysis isolates a female voice whisper, narrowing suspects down to Elena Rostova.
+  eliminatesSuspectID: 
+  eliminationFinding: Encrypted transmission traces establish direct communication with the perpetrator. Both Victor Sterling and Elena Rostova held terminal encryption credentials, narrowing suspicion to them!
   quizQuestion: What acoustic voice profile was identified in the wiretap recording?
   options:
   - Low male resonance matching Victor

@@ -18,6 +18,12 @@ public static class CaseSwitchHelper
         EditorSceneManager.OpenScene("Assets/_Project/Scenes/Case02_Main.unity");
     }
 
+    [MenuItem("Cases/Transform Case 02 into Sci-Fi Lab")]
+    public static void TransformCase2ToLab()
+    {
+        Case2LabSetup.RunFullSetup();
+    }
+
     [MenuItem("Cases/Open Main Menu")]
     public static void OpenMainMenu()
     {

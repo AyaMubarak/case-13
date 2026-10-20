@@ -231,23 +231,83 @@ public class SeparateInterrogationManager : MonoBehaviour
             target.isWaitingForInteraction = false;
             target.actionTime = Time.time;
 
+            Vector3 destination = (target.chairTarget != null) ? target.chairTarget.position : chairSeatPosition;
+            destination.y = 0f;
+
+            bool usedNavMesh = false;
             if (target.agent != null)
             {
-                target.agent.baseOffset = 0f;
-                target.agent.enabled = true;
-                target.agent.isStopped = false;
-                Vector3 destination = chairSeatPosition;
-                destination.y = 0f;
-                target.agent.SetDestination(destination);
-
-                if (target.animator != null)
+                if (NavMesh.SamplePosition(target.suspectObject.position, out NavMeshHit hit, 1.5f, NavMesh.AllAreas))
                 {
-                    target.animator.SetBool("isWalking", true);
-                    target.animator.SetFloat("Speed", 1.5f);
-                    target.animator.SetFloat("Velocity", 1.5f);
+                    try
+                    {
+                        target.agent.baseOffset = 0f;
+                        target.agent.enabled = true;
+                        if (target.agent.isOnNavMesh)
+                        {
+                            target.agent.isStopped = false;
+                            target.agent.SetDestination(destination);
+                            usedNavMesh = true;
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogWarning($"[Interrogation] NavMeshAgent exception: {ex.Message}. Falling back to direct movement.");
+                        usedNavMesh = false;
+                    }
+                }
+
+                if (!usedNavMesh)
+                {
+                    target.agent.enabled = false;
                 }
             }
+
+            if (target.animator != null)
+            {
+                target.animator.SetBool("isWalking", true);
+                target.animator.SetFloat("Speed", 1.5f);
+                target.animator.SetFloat("Velocity", 1.5f);
+            }
+
+            if (!usedNavMesh)
+            {
+                StartCoroutine(DirectMoveSuspectToChair(target, destination, (currentSuspectTurn == 1) ? 1 : 2));
+            }
         }
+    }
+
+    private IEnumerator DirectMoveSuspectToChair(SuspectData suspect, Vector3 destination, int suspectIndex)
+    {
+        if (suspect.suspectObject == null) yield break;
+
+        float moveSpeed = 1.8f;
+        while (suspect.suspectObject != null && !suspect.hasReached)
+        {
+            Vector3 curPos = suspect.suspectObject.position;
+            curPos.y = 0f;
+            Vector3 diff = destination - curPos;
+            diff.y = 0f;
+
+            if (diff.magnitude <= 0.35f)
+            {
+                break;
+            }
+
+            if (diff.sqrMagnitude > 0.001f)
+            {
+                Quaternion targetRot = Quaternion.LookRotation(diff);
+                suspect.suspectObject.rotation = Quaternion.Slerp(suspect.suspectObject.rotation, targetRot, Time.deltaTime * 6f);
+            }
+
+            Vector3 nextPos = Vector3.MoveTowards(curPos, destination, moveSpeed * Time.deltaTime);
+            nextPos.y = 0f;
+            suspect.suspectObject.position = nextPos;
+
+            yield return null;
+        }
+
+        CheckSuspectArrival(suspect, suspectIndex);
     }
 
     void Update()
@@ -301,9 +361,12 @@ public class SeparateInterrogationManager : MonoBehaviour
 
         bool hasArrived = false;
         
-        if (suspect.agent != null && suspect.suspectObject != null)
+        Vector3 targetChairPos = (suspect.chairTarget != null) ? suspect.chairTarget.position : chairSeatPosition;
+        Quaternion targetChairRot = (suspect.chairTarget != null) ? suspect.chairTarget.rotation : chairSeatRotation;
+
+        if (suspect.agent != null && suspect.agent.enabled && suspect.agent.isOnNavMesh && suspect.suspectObject != null)
         {
-            float distance = Vector3.Distance(suspect.suspectObject.position, chairSeatPosition);
+            float distance = Vector3.Distance(suspect.suspectObject.position, targetChairPos);
             if (!suspect.agent.pathPending)
             {
                 if ((suspect.agent.hasPath && suspect.agent.remainingDistance <= suspect.agent.stoppingDistance + 0.25f) || distance < 1.0f)
@@ -314,7 +377,7 @@ public class SeparateInterrogationManager : MonoBehaviour
         }
         else if (suspect.suspectObject != null)
         {
-            float distance = Vector3.Distance(suspect.suspectObject.position, chairSeatPosition);
+            float distance = Vector3.Distance(suspect.suspectObject.position, targetChairPos);
             if (distance < 1.0f) hasArrived = true;
         }
 
@@ -328,7 +391,7 @@ public class SeparateInterrogationManager : MonoBehaviour
             suspect.hasReached = true;
             if (suspect.agent != null)
             {
-                suspect.agent.isStopped = true;
+                if (suspect.agent.enabled && suspect.agent.isOnNavMesh) suspect.agent.isStopped = true;
                 suspect.agent.enabled = false;
             }
 
@@ -337,8 +400,8 @@ public class SeparateInterrogationManager : MonoBehaviour
                 suspect.suspectCollider.enabled = false;
             }
 
-            suspect.suspectObject.position = chairSeatPosition;
-            suspect.suspectObject.rotation = chairSeatRotation;
+            suspect.suspectObject.position = targetChairPos;
+            suspect.suspectObject.rotation = targetChairRot;
 
             if (suspect.animator != null)
             {

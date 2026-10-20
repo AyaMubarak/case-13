@@ -36,34 +36,51 @@ public class Evidence : MonoBehaviour, IInteractable
 
     private void Awake()
     {
-        // التأكد من وجود كوليدر على كائن الدليل أو أطفاله ليتم رصده بنصف قطر تفاعل اللاعب
-        Collider col = GetComponentInChildren<Collider>();
-        if (col == null)
+        // إزالة أي MeshCollider تالف بدون شبكة (null mesh) لمنع تعطل كشف التصادم
+        foreach (var mc in GetComponentsInChildren<MeshCollider>(true))
         {
-            BoxCollider box = gameObject.AddComponent<BoxCollider>();
-            box.size = new Vector3(0.5f, 0.5f, 0.5f);
-            box.isTrigger = true;
+            if (mc != null && mc.sharedMesh == null)
+            {
+                Destroy(mc);
+            }
         }
+
+        // التأكد من وجود SphereCollider بنصف قطر مريح (0.5m) لضمان التفاعل من فوق الطاولات
+        SphereCollider sphere = GetComponent<SphereCollider>();
+        if (sphere == null)
+        {
+            sphere = gameObject.AddComponent<SphereCollider>();
+        }
+        sphere.isTrigger = true;
+        sphere.radius = Mathf.Max(sphere.radius, 0.5f);
+    }
+
+    public bool CanInteractWithCurrentRole()
+    {
+        if (requiredRole == DetectiveRole.Any) return true;
+
+        var profile = PlayerProfile.LocalInstance;
+        if (profile == null) return false;
+
+        return profile.CurrentRole == requiredRole;
     }
 
     public string InteractionPrompt
     {
         get
         {
-            var profile = PlayerProfile.LocalInstance;
-            if (profile != null && requiredRole != DetectiveRole.Any && profile.CurrentRole != requiredRole)
+            if (!CanInteractWithCurrentRole())
             {
                 return $"[LOCKED] Requires {requiredRole}";
             }
-            return $"{promptMessage} {evidenceName} ({requiredRole})";
+            return $"{promptMessage} {evidenceName}";
         }
     }
 
     public void Interact()
     {
-        // التحقق من دور اللاعب الحالي (PlayerProfile) مطابق لمتطلبات الدليل أم لا
-        var profile = PlayerProfile.LocalInstance;
-        if (profile != null && requiredRole != DetectiveRole.Any && profile.CurrentRole != requiredRole)
+        // التحقق من صلاحية الدور
+        if (!CanInteractWithCurrentRole())
         {
             Debug.LogWarning($"<color=red>Access Denied!</color> This evidence requires role: {requiredRole}");
             if (UIManager.Instance != null)

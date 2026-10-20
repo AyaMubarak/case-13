@@ -186,8 +186,8 @@ MonoBehaviour:
   description: Partially incinerated notebook page detailing the covert transfer schedule for the quantum chip.
   requiredRole: 2
   evidenceVideoClip: {fileID: 32900000, guid: 6eece1ce409db9247852a5e4f03a6c2a, type: 3}
-  eliminatesSuspectID: SUS_DAMIAN
-  eliminationFinding: Notebook reveals the scheduled handoff was at 22:15, confirming the murder was premeditated.
+  eliminatesSuspectID: 
+  eliminationFinding: Lab notes reveal cipher protocols and cyanide formulations known only to Dr. King, Victor Sterling, and Elena Rostova. The investigation centers entirely on Victor and Elena!
   quizQuestion: What secret rendezvous time is recorded on the surviving notebook fragment?
   options:
   - 20:00 PM
