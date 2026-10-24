@@ -53,6 +53,12 @@ public class CaseDossierManager : MonoBehaviour
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
 
+        AssignVictorPortrait();
+        AssignElenaPortrait();
+        AssignPortrait("SUS_ARTHUR", "Arthur", "Portraits/Arthur");
+        AssignPortrait("SUS_MAYA", "Maya", "Portraits/Maya_Lin");
+        AssignPortrait("SUS_DAMIAN", "Damian", "Portraits/Damian");
+
         if (closeDossierBtn != null)
         {
             closeDossierBtn.onClick.RemoveAllListeners();
@@ -69,6 +75,48 @@ public class CaseDossierManager : MonoBehaviour
         {
             manualEliminateBtn.onClick.RemoveAllListeners();
             manualEliminateBtn.onClick.AddListener(EliminateCurrentSuspect);
+        }
+    }
+
+    private void AssignElenaPortrait()
+    {
+        Sprite elenaPortrait = Resources.Load<Sprite>("Portraits/Elena_Rostova");
+        if (elenaPortrait == null) return;
+
+        foreach (SuspectProfile suspect in suspects)
+        {
+            if (suspect != null && (suspect.suspectID == "SUS_ELENA" || (suspect.suspectName ?? "").Contains("Elena")))
+            {
+                suspect.portrait = elenaPortrait;
+            }
+        }
+    }
+
+    private void AssignVictorPortrait()
+    {
+        Sprite victorPortrait = Resources.Load<Sprite>("Portraits/Victor_Sterling");
+        if (victorPortrait == null) return;
+
+        foreach (SuspectProfile suspect in suspects)
+        {
+            if (suspect != null && (suspect.suspectID == "SUS_VICTOR" || (suspect.suspectName ?? "").Contains("Victor")))
+            {
+                suspect.portrait = victorPortrait;
+            }
+        }
+    }
+
+    private void AssignPortrait(string suspectId, string suspectName, string resourcePath)
+    {
+        Sprite portrait = Resources.Load<Sprite>(resourcePath);
+        if (portrait == null) return;
+
+        foreach (SuspectProfile suspect in suspects)
+        {
+            if (suspect != null && (suspect.suspectID == suspectId || (suspect.suspectName ?? "").Contains(suspectName)))
+            {
+                suspect.portrait = portrait;
+            }
         }
     }
 

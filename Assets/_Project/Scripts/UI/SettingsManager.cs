@@ -26,6 +26,12 @@ public class SettingsManager : MonoBehaviour
     private void OnEnable()
     {
         LoadSettings();
+        ConfigureResponsiveLayout();
+    }
+
+    private void Start()
+    {
+        ConfigureResponsiveLayout();
     }
 
     public void LoadSettings()
@@ -76,5 +82,30 @@ public class SettingsManager : MonoBehaviour
     private void UpdateText(TextMeshProUGUI txt, float val)
     {
         if (txt != null) txt.text = Mathf.RoundToInt(val * 100f) + "%";
+    }
+
+    private void ConfigureResponsiveLayout()
+    {
+        if (invertYToggle == null) return;
+
+        RectTransform toggleRect = invertYToggle.transform as RectTransform;
+        if (toggleRect == null) return;
+
+        // The authored toggle was scaled to 176% with a 556px hit box, which put it outside
+        // the dossier panel on tablets and intercepted taps meant for other controls.
+        toggleRect.localScale = Vector3.one;
+        toggleRect.sizeDelta = new Vector2(120f, 54f);
+        toggleRect.anchoredPosition = new Vector2(410f, 8f);
+
+        ResizeToggleGraphic(invertYToggle.targetGraphic != null ? invertYToggle.targetGraphic.rectTransform : null, new Vector2(120f, 54f));
+        ResizeToggleGraphic(invertYToggle.graphic != null ? invertYToggle.graphic.rectTransform : null, new Vector2(42f, 42f));
+        Canvas.ForceUpdateCanvases();
+    }
+
+    private static void ResizeToggleGraphic(RectTransform graphic, Vector2 size)
+    {
+        if (graphic == null) return;
+        graphic.localScale = Vector3.one;
+        graphic.sizeDelta = size;
     }
 }

@@ -45,17 +45,28 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
     [Header("Navigation Panels")]
     [SerializeField] private GameObject characterSelectPanel;
 
+    [Header("Match Start")]
+    [SerializeField] private bool autoStartWhenRoomFull = true;
+
     private const string ROLE_KEY = "Role";
     private const string GENDER_KEY = "Gender";
+    private static readonly Color ReadyColor = new Color(0.25f, 0.95f, 0.55f, 1f);
+    private static readonly Color WaitingColor = new Color(0.62f, 0.68f, 0.76f, 1f);
+    private static readonly Color HostColor = new Color(1f, 0.8f, 0.25f, 1f);
+    private bool roomOperationInProgress;
+    private bool leavingForDuplicateRole;
+    private bool returnToCharacterSelectAfterLeaving;
 
     private void Awake()
     {
         InitializeRoleSpritesAndImages();
+        ConfigureSlotPresentation();
     }
 
     private void Start()
     {
         InitializeRoleSpritesAndImages();
+        ConfigureSlotPresentation();
 
         // الاتصال بسيرفر Photon تلقائياً عند بدء التشغيل
         if (!PhotonNetwork.IsConnected)
@@ -150,6 +161,8 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
 
     public void OnCreateRoomClicked()
     {
+        if (!CanStartRoomOperation()) return;
+
         string localRole = PlayerPrefs.GetString("Player_Role", "Field Detective");
         string localName = PlayerPrefs.GetString("Player_Name", "Detective 1");
         string localGender = PlayerPrefs.GetString("Player_Gender", "Male");
@@ -164,9 +177,10 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(playerProps);
 
         // إنشاء رمز الغرفة
-        string roomCode = string.IsNullOrWhiteSpace(roomCodeInput.text)
+        string enteredCode = roomCodeInput != null ? roomCodeInput.text : "";
+        string roomCode = string.IsNullOrWhiteSpace(enteredCode)
             ? Random.Range(1000, 9999).ToString()
-            : roomCodeInput.text.Trim();
+            : enteredCode.Trim();
 
         RoomOptions options = new RoomOptions
         {
@@ -176,12 +190,15 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
         };
 
         UpdateStatus($"Creating Room {roomCode}...");
+        roomOperationInProgress = true;
         SetButtonsInteractable(false);
         PhotonNetwork.CreateRoom(roomCode, options);
     }
 
     public void OnJoinRoomClicked()
     {
+        if (!CanStartRoomOperation()) return;
+
         string enteredCode = roomCodeInput != null ? roomCodeInput.text.Trim() : "";
 
         if (string.IsNullOrEmpty(enteredCode))
@@ -203,6 +220,7 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(playerProps);
 
         UpdateStatus($"Joining Room {enteredCode}...");
+        roomOperationInProgress = true;
         SetButtonsInteractable(false);
         PhotonNetwork.JoinRoom(enteredCode);
     }
@@ -211,28 +229,62 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
 
     public override void OnJoinedRoom()
     {
+        roomOperationInProgress = false;
         UpdateStatus($"In Room: {PhotonNetwork.CurrentRoom.Name}");
         if (roomCodeInput != null) roomCodeInput.text = PhotonNetwork.CurrentRoom.Name;
 
         // التحقق من تكرار الدور مع اللاعبين الموجودين
         if (IsRoleDuplicate())
         {
-            UpdateStatus("Role already taken! Please choose another role.");
+            leavingForDuplicateRole = true;
+            UpdateStatus("ROLE ALREADY TAKEN // RETURNING TO LOBBY");
             PhotonNetwork.LeaveRoom();
             return;
         }
 
         UpdateSlotsUI();
+        TryStartMatchWhenFull();
     }
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
         UpdateSlotsUI();
+        TryStartMatchWhenFull();
     }
 
     public override void OnPlayerLeftRoom(Player otherPlayer)
     {
         UpdateSlotsUI();
+    }
+
+    public override void OnLeftRoom()
+    {
+        roomOperationInProgress = false;
+        SetButtonsInteractable(true);
+        UpdateSlotsUI();
+
+        if (leavingForDuplicateRole)
+        {
+            leavingForDuplicateRole = false;
+            UpdateStatus("ROLE ALREADY TAKEN // CHOOSE ANOTHER ROLE OR ROOM");
+        }
+        else
+        {
+            UpdateStatus("Left room. Ready to create or join another room.");
+        }
+
+        if (returnToCharacterSelectAfterLeaving)
+        {
+            returnToCharacterSelectAfterLeaving = false;
+            gameObject.SetActive(false);
+            if (characterSelectPanel != null) characterSelectPanel.SetActive(true);
+        }
+    }
+
+    public override void OnMasterClientSwitched(Player newMasterClient)
+    {
+        UpdateSlotsUI();
+        TryStartMatchWhenFull();
     }
 
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
@@ -242,13 +294,15 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
 
     public override void OnJoinRoomFailed(short returnCode, string message)
     {
-        UpdateStatus("Room not found or full!");
+        roomOperationInProgress = false;
+        UpdateStatus(returnCode == ErrorCode.GameFull ? "ROOM IS FULL // TRY ANOTHER ROOM" : "ROOM NOT FOUND // CHECK THE CODE");
         SetButtonsInteractable(true);
     }
 
     public override void OnCreateRoomFailed(short returnCode, string message)
     {
-        UpdateStatus("Room code exists! Try another.");
+        roomOperationInProgress = false;
+        UpdateStatus("ROOM CODE EXISTS // TRY ANOTHER CODE");
         SetButtonsInteractable(true);
     }
 
@@ -277,7 +331,6 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
 
     private void UpdateSlotsUI()
     {
-        // مصفوفة لنصوص الكروت وصور الأدوار الأربعة
         TextMeshProUGUI[] names = { player1Name, player2Name, player3Name, player4Name };
         TextMeshProUGUI[] statuses = { player1Status, player2Status, player3Status, player4Status };
         Image[] roleImages = { player1RoleImage, player2RoleImage, player3RoleImage, player4RoleImage };
@@ -285,36 +338,28 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
         // تصفير جميع الكروت لوضع الانتظار أولاً (Waiting فقط)
         for (int i = 0; i < 4; i++)
         {
-            if (names[i] != null) names[i].text = $"Player {i + 1}";
+            if (names[i] != null) names[i].text = $"OPEN SLOT {i + 1}";
             if (statuses[i] != null)
             {
-                statuses[i].text = "Waiting";
-                statuses[i].color = new Color(0.7f, 0.7f, 0.7f, 0.8f);
+                statuses[i].text = "WAITING FOR PLAYER";
+                statuses[i].color = WaitingColor;
             }
 
             if (roleImages[i] != null)
             {
-                // إخفاء أو تعتيم الصورة عندما تكون الفتحة خالية
                 roleImages[i].sprite = null;
-                roleImages[i].color = new Color(0.12f, 0.12f, 0.15f, 1f); // لون خلفية البطاقة لتغطية أي رسمة قديمة
+                roleImages[i].enabled = false;
             }
         }
 
         if (!PhotonNetwork.InRoom)
         {
             // إذا لم ننضم لغرفة بعد، نعرض بيانات اللاعب المحلي فقط في الخانة الأولى بحالة Ready
-            string localRole = PlayerPrefs.GetString("Player_Role", "Field Detective");
-            if (names[0] != null) names[0].text = PlayerPrefs.GetString("Player_Name", "Detective 1");
+            if (names[0] != null) names[0].text = FormatPlayerName(PlayerPrefs.GetString("Player_Name", "Detective 1"));
             if (statuses[0] != null)
             {
-                statuses[0].text = "Ready";
-                statuses[0].color = new Color(0.2f, 0.9f, 0.4f, 1f); // لون أخضر جذاب لحالة Ready
-            }
-
-            if (roleImages[0] != null)
-            {
-                roleImages[0].sprite = GetRoleSprite(localRole);
-                roleImages[0].color = Color.white;
+                statuses[0].text = "● READY TO JOIN";
+                statuses[0].color = ReadyColor;
             }
 
             if (startGameButton != null) startGameButton.interactable = false;
@@ -326,25 +371,15 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
         for (int i = 0; i < players.Length && i < 4; i++)
         {
             string pName = string.IsNullOrEmpty(players[i].NickName) ? $"Player {i + 1}" : players[i].NickName;
-            string pRole = players[i].CustomProperties.ContainsKey(ROLE_KEY) 
-                ? players[i].CustomProperties[ROLE_KEY].ToString() 
-                : "Field Detective";
-
-            if (names[i] != null) names[i].text = pName;
+            if (names[i] != null) names[i].text = FormatPlayerName(pName);
             
             // حالة اللاعب المنضم تكون دائماً Ready فقط
             if (statuses[i] != null)
             {
-                statuses[i].text = "Ready";
-                statuses[i].color = new Color(0.2f, 0.9f, 0.4f, 1f);
+                statuses[i].text = players[i].IsMasterClient ? "★ HOST • READY" : "● READY";
+                statuses[i].color = players[i].IsMasterClient ? HostColor : ReadyColor;
             }
 
-            // عرض صورة الدور الخاصة باللاعب في البطاقة
-            if (roleImages[i] != null)
-            {
-                roleImages[i].sprite = GetRoleSprite(pRole);
-                roleImages[i].color = Color.white;
-            }
         }
 
         // تفعيل زر Start Game فقط إذا كان اللاعب هو الـ MasterClient (صاحب الغرفة)
@@ -352,11 +387,14 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
         {
             startGameButton.interactable = PhotonNetwork.IsMasterClient;
         }
+
+        RectTransform lobbyRect = transform as RectTransform;
+        if (lobbyRect != null) LayoutRebuilder.ForceRebuildLayoutImmediate(lobbyRect);
     }
 
     public void OnStartGameClicked()
     {
-        if (PhotonNetwork.IsMasterClient)
+        if (PhotonNetwork.IsMasterClient && PhotonNetwork.InRoom)
         {
             UpdateStatus("Loading Game Scene...");
             string sceneToLoad = PlayerPrefs.GetString("Selected_Case", "Case01_Main");
@@ -368,7 +406,12 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
     {
         if (PhotonNetwork.InRoom)
         {
+            roomOperationInProgress = true;
+            returnToCharacterSelectAfterLeaving = true;
+            SetButtonsInteractable(false);
+            UpdateStatus("LEAVING ROOM...");
             PhotonNetwork.LeaveRoom();
+            return;
         }
 
         gameObject.SetActive(false);
@@ -388,5 +431,115 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
     {
         if (createRoomButton != null) createRoomButton.interactable = state;
         if (joinRoomButton != null) joinRoomButton.interactable = state;
+    }
+
+    private bool CanStartRoomOperation()
+    {
+        if (roomOperationInProgress)
+        {
+            UpdateStatus("PLEASE WAIT FOR THE CURRENT ROOM REQUEST");
+            return false;
+        }
+
+        if (!PhotonNetwork.IsConnectedAndReady)
+        {
+            UpdateStatus("CONNECTING TO SERVER // PLEASE WAIT");
+            return false;
+        }
+
+        if (PhotonNetwork.InRoom)
+        {
+            UpdateStatus("ALREADY IN A ROOM // LEAVE IT BEFORE JOINING ANOTHER");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void TryStartMatchWhenFull()
+    {
+        if (!autoStartWhenRoomFull || !PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom) return;
+        if (PhotonNetwork.CurrentRoom.PlayerCount != PhotonNetwork.CurrentRoom.MaxPlayers) return;
+        if (HasDuplicateRoles()) return;
+
+        UpdateStatus("ROOM FULL // LOADING GAME...");
+        OnStartGameClicked();
+    }
+
+    private bool HasDuplicateRoles()
+    {
+        HashSet<string> assignedRoles = new HashSet<string>();
+        foreach (Player player in PhotonNetwork.PlayerList)
+        {
+            if (!player.CustomProperties.TryGetValue(ROLE_KEY, out object value)) return true;
+            if (!assignedRoles.Add(value.ToString())) return true;
+        }
+
+        return false;
+    }
+
+    private void ConfigureSlotPresentation()
+    {
+        TextMeshProUGUI[] names = { player1Name, player2Name, player3Name, player4Name };
+        TextMeshProUGUI[] statuses = { player1Status, player2Status, player3Status, player4Status };
+        Image[] roleImages = { player1RoleImage, player2RoleImage, player3RoleImage, player4RoleImage };
+
+        for (int index = 0; index < names.Length; index++)
+        {
+            TextMeshProUGUI nameText = names[index];
+            if (nameText == null) continue;
+            nameText.enableAutoSizing = true;
+            nameText.fontSizeMin = 14f;
+            nameText.fontSizeMax = 25f;
+            nameText.textWrappingMode = TextWrappingModes.NoWrap;
+            nameText.overflowMode = TextOverflowModes.Ellipsis;
+            nameText.alignment = TextAlignmentOptions.Center;
+
+            // These labels are separate children of LobbyPanel (not children of
+            // the slot cards). Their scene positions already match their cards.
+            // Re-anchoring them to LobbyPanel made all four labels overlap.
+        }
+
+        for (int index = 0; index < statuses.Length; index++)
+        {
+            TextMeshProUGUI statusText = statuses[index];
+            if (statusText == null) continue;
+            statusText.enableAutoSizing = true;
+            statusText.fontSizeMin = 11f;
+            statusText.fontSizeMax = 17f;
+            statusText.textWrappingMode = TextWrappingModes.NoWrap;
+            statusText.overflowMode = TextOverflowModes.Ellipsis;
+            statusText.alignment = TextAlignmentOptions.Center;
+
+            // Keep the authored scene position; only text sizing/alignment is
+            // configured here so the layout remains stable on every aspect ratio.
+        }
+
+        for (int index = 0; index < roleImages.Length; index++)
+        {
+            Image roleImage = roleImages[index];
+            if (roleImage == null) continue;
+            roleImage.type = Image.Type.Simple;
+            roleImage.preserveAspect = true;
+            // Role images are also authored in the scene at the centre of each
+            // card. Do not apply anchors relative to the whole lobby panel.
+        }
+    }
+
+    private static void PositionTextInsideSlot(RectTransform element, float minX, float minY, float maxX, float maxY)
+    {
+        if (element == null || element.parent == null) return;
+
+        element.anchorMin = new Vector2(minX, minY);
+        element.anchorMax = new Vector2(maxX, maxY);
+        element.offsetMin = Vector2.zero;
+        element.offsetMax = Vector2.zero;
+    }
+
+    private static string FormatPlayerName(string playerName)
+    {
+        const int maxLength = 16;
+        string trimmedName = string.IsNullOrWhiteSpace(playerName) ? "DETECTIVE" : playerName.Trim();
+        return trimmedName.Length <= maxLength ? trimmedName.ToUpperInvariant() : trimmedName.Substring(0, maxLength - 1).ToUpperInvariant() + "…";
     }
 }

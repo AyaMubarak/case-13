@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.AI;
+using UnityEngine.SceneManagement;
 
 [RequireComponent(typeof(Rigidbody), typeof(CapsuleCollider))]
 public class PlayerMovement : MonoBehaviour
@@ -20,6 +22,7 @@ public class PlayerMovement : MonoBehaviour
     private Rigidbody rb;
     private CapsuleCollider playerCollider;
     private Camera cam;
+    private Animator[] animators;
 
     private Vector2 moveInput;
 
@@ -60,6 +63,63 @@ public class PlayerMovement : MonoBehaviour
         // Player collider must physically collide
         playerCollider.isTrigger = false;
         playerCollider.enabled = true;
+        animators = GetComponentsInChildren<Animator>(true);
+    }
+
+    private void Start()
+    {
+        MoveOutOfBlockedCaseOneSpawn();
+    }
+
+    private void MoveOutOfBlockedCaseOneSpawn()
+    {
+        if (!SceneManager.GetActiveScene().name.Contains("Case01")) return;
+        if (!IsBlocked(transform.position)) return;
+
+        int roleIndex = GetRoleSpawnIndex();
+        Vector3 origin = transform.position;
+        for (int ring = 1; ring <= 8; ring++)
+        {
+            for (int step = 0; step < 12; step++)
+            {
+                float angle = (step * 30f) + (roleIndex * 90f);
+                Vector3 offset = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * ring;
+                if (!NavMesh.SamplePosition(origin + offset, out NavMeshHit hit, 1.25f, NavMesh.AllAreas)) continue;
+                if (IsBlocked(hit.position)) continue;
+
+                transform.position = hit.position;
+                rb.position = hit.position;
+                return;
+            }
+        }
+    }
+
+    private bool IsBlocked(Vector3 position)
+    {
+        bool colliderWasEnabled = playerCollider.enabled;
+        playerCollider.enabled = false;
+
+        float radius = playerCollider.radius;
+        float halfSegment = Mathf.Max(0f, (playerCollider.height * 0.5f) - radius);
+        Vector3 center = position + playerCollider.center;
+        bool blocked = Physics.CheckCapsule(
+            center + Vector3.up * halfSegment,
+            center - Vector3.up * halfSegment,
+            radius,
+            collisionLayers,
+            QueryTriggerInteraction.Ignore);
+
+        playerCollider.enabled = colliderWasEnabled;
+        return blocked;
+    }
+
+    private static int GetRoleSpawnIndex()
+    {
+        string role = PlayerPrefs.GetString("Player_Role", "Field Detective");
+        if (role.Contains("Forensics")) return 1;
+        if (role.Contains("Digital")) return 2;
+        if (role.Contains("Interrogator")) return 3;
+        return 0;
     }
 
     [Header("Local Test (تيست محلي)")]
@@ -76,11 +136,13 @@ public class PlayerMovement : MonoBehaviour
         if (CaseIntroCutscene.IsPlaying || EvidenceCutsceneManager.IsQuizOrVideoActive)
         {
             moveInput = Vector2.zero;
+            UpdateWalkAnimation(false);
             return;
         }
 
         ReadInput();
 
+        bool movedThisFrame = false;
         if (forceSimpleMove && moveInput.sqrMagnitude >= 0.001f)
         {
             Vector3 fwd = cam != null ? cam.transform.forward : transform.forward;
@@ -99,8 +161,19 @@ public class PlayerMovement : MonoBehaviour
                 Vector3 delta = dir * allowedDistance;
                 if (rb != null) rb.position += delta;
                 transform.position += delta;
+
+                if (SceneManager.GetActiveScene().name == "Case01_Main")
+                {
+                    Vector3 clampedPosition = Case01RoomShell.ClampToRoom(transform.position);
+                    transform.position = clampedPosition;
+                    if (rb != null) rb.position = clampedPosition;
+                }
+
+                movedThisFrame = true;
             }
         }
+
+        UpdateWalkAnimation(movedThisFrame);
 
         // تثبيت اللاعب على الأرض مباشرة لمنع الطفو، مع منع تسلقه فوق الأجسام المرتفعة
         SnapPlayerToFloor();
@@ -276,6 +349,46 @@ public class PlayerMovement : MonoBehaviour
         // ==========================================
         // ROTATION IS HANDLED BY CAMERA IN FPS
         // ==========================================
+    }
+
+    private void UpdateWalkAnimation(bool isMoving)
+    {
+        if (animators == null || animators.Length == 0)
+            animators = GetComponentsInChildren<Animator>(true);
+
+        float speed = isMoving ? 1f : 0f;
+        foreach (Animator animator in animators)
+        {
+            if (animator == null || animator.runtimeAnimatorController == null) continue;
+            SetFloatIfPresent(animator, "Speed", speed);
+            SetFloatIfPresent(animator, "speed", speed);
+            SetBoolIfPresent(animator, "isWalking", isMoving);
+            SetBoolIfPresent(animator, "IsWalking", isMoving);
+        }
+    }
+
+    private static void SetFloatIfPresent(Animator animator, string parameterName, float value)
+    {
+        foreach (AnimatorControllerParameter parameter in animator.parameters)
+        {
+            if (parameter.type == AnimatorControllerParameterType.Float && parameter.name == parameterName)
+            {
+                animator.SetFloat(parameterName, value);
+                return;
+            }
+        }
+    }
+
+    private static void SetBoolIfPresent(Animator animator, string parameterName, bool value)
+    {
+        foreach (AnimatorControllerParameter parameter in animator.parameters)
+        {
+            if (parameter.type == AnimatorControllerParameterType.Bool && parameter.name == parameterName)
+            {
+                animator.SetBool(parameterName, value);
+                return;
+            }
+        }
     }
 
     // ============================================================

@@ -1,26 +1,52 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using TMPro;
 
 public class MainMenuUI : MonoBehaviour
 {
     [Header("Main Menu Panels")]
     public GameObject mainMenuPanel;
     public GameObject settingsPanel;
-    public GameObject characterSelectPanel; // غيرناها لتنتقل لاختيار الشخصية أولاً
+    public GameObject characterSelectPanel;
+    public GameObject lobbyPanel;
     public GameObject quitPanel;
 
     [Header("Lobby Settings")]
     public Button startGameBtn;
 
+    private void Awake()
+    {
+        EnsureResponsiveCanvases();
+        ResolvePanels();
+    }
+
     private void Start()
     {
+        EnsureResponsiveCanvases();
+
         // إظهار القائمة الرئيسية فقط في البداية
         OpenMainMenu();
 
         // إخفاء الماوس إذا كان مخفياً وإظهاره
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+
+        BindBackButtons();
+        BindMainMenuButtons();
+    }
+
+    private void EnsureResponsiveCanvases()
+    {
+        Canvas[] canvases = GetComponentsInParent<Canvas>(true);
+        if (canvases == null || canvases.Length == 0)
+            canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Include);
+
+        foreach (Canvas canvas in canvases)
+        {
+            if (canvas != null && canvas.GetComponent<ResponsiveCanvasLayout>() == null)
+                canvas.gameObject.AddComponent<ResponsiveCanvasLayout>();
+        }
     }
 
     public void OpenMainMenu()
@@ -28,6 +54,7 @@ public class MainMenuUI : MonoBehaviour
         mainMenuPanel.SetActive(true);
         if(settingsPanel != null) settingsPanel.SetActive(false);
         if(characterSelectPanel != null) characterSelectPanel.SetActive(false);
+        if(lobbyPanel != null) lobbyPanel.SetActive(false);
         if(quitPanel != null) quitPanel.SetActive(false);
     }
 
@@ -39,7 +66,75 @@ public class MainMenuUI : MonoBehaviour
     public void OpenCharacterSelect()
     {
         mainMenuPanel.SetActive(false);
-        if(characterSelectPanel != null) characterSelectPanel.SetActive(true);
+        if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (lobbyPanel != null) lobbyPanel.SetActive(false);
+        if (characterSelectPanel != null) characterSelectPanel.SetActive(true);
+    }
+
+    private void ResolvePanels()
+    {
+        if (characterSelectPanel == null)
+        {
+            CharacterSelectManager selector = FindAnyObjectByType<CharacterSelectManager>(FindObjectsInactive.Include);
+            if (selector != null) characterSelectPanel = selector.gameObject;
+        }
+
+        if (lobbyPanel == null)
+        {
+            LobbyUIManager lobby = FindAnyObjectByType<LobbyUIManager>(FindObjectsInactive.Include);
+            if (lobby != null) lobbyPanel = lobby.gameObject;
+        }
+    }
+
+    private void BindBackButtons()
+    {
+        foreach (Button backButton in GetComponentsInChildren<Button>(true))
+        {
+            if (backButton.GetComponentInParent<LobbyUIManager>(true) != null)
+                continue;
+            if (backButton.GetComponentInParent<CharacterSelectManager>(true) != null)
+                continue;
+
+            string buttonName = backButton.name.ToLowerInvariant();
+            if (!buttonName.Contains("back")) continue;
+
+            if (buttonName.Contains("role"))
+            {
+                backButton.onClick.AddListener(OpenCharacterSelect);
+            }
+            else
+            {
+                backButton.onClick.AddListener(OpenMainMenu);
+            }
+        }
+    }
+
+    private void BindMainMenuButtons()
+    {
+        if (mainMenuPanel == null) return;
+
+        foreach (Button button in mainMenuPanel.GetComponentsInChildren<Button>(true))
+        {
+            string key = button.name.ToLowerInvariant();
+            TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
+            if (label != null) key += " " + label.text.ToLowerInvariant();
+
+            if (key.Contains("setting"))
+            {
+                button.onClick.RemoveListener(OpenSettings);
+                button.onClick.AddListener(OpenSettings);
+            }
+            else if (key.Contains("quit") || key.Contains("exit"))
+            {
+                button.onClick.RemoveListener(OpenQuitPanel);
+                button.onClick.AddListener(OpenQuitPanel);
+            }
+            else if (key.Contains("play") || key.Contains("start") || key.Contains("case") || key.Contains("begin"))
+            {
+                button.onClick.RemoveListener(OpenCharacterSelect);
+                button.onClick.AddListener(OpenCharacterSelect);
+            }
+        }
     }
 
     public static string SelectedCaseScene = "Case01_Main";

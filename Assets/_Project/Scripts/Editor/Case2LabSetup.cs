@@ -282,7 +282,7 @@ public class Case2LabSetup : EditorWindow
                 interrogationChair = (GameObject)PrefabUtility.InstantiatePrefab(chairPrefab, propsContainer);
                 interrogationChair.name = "Interrogation_Lab_Chair";
                 interrogationChair.transform.localPosition = new Vector3(4.2f, 0.0f, 33.25f);
-                interrogationChair.transform.localRotation = Quaternion.Euler(0, -90f, 0); // Backrest South (-Z), Seat North (+Z towards desk)
+                interrogationChair.transform.localRotation = Quaternion.identity;
 
                 GameObject investigatorChair = (GameObject)PrefabUtility.InstantiatePrefab(chairPrefab, propsContainer);
                 investigatorChair.name = "Investigator_Desk_Chair";
@@ -585,7 +585,7 @@ public class Case2LabSetup : EditorWindow
         if (chairObj != null)
         {
             chairObj.transform.position = chairPos;
-            chairObj.transform.rotation = Quaternion.Euler(0, -90f, 0); // Backrest South (-Z), Seat North (+Z)
+            chairObj.transform.rotation = Quaternion.identity;
             EditorUtility.SetDirty(chairObj);
         }
 
@@ -633,6 +633,13 @@ public class Case2LabSetup : EditorWindow
             victorGO.transform.rotation = Quaternion.Euler(0, 150, 0);
             victorGO.transform.localScale = Vector3.one;
             ConfigureCharacterModel(victorGO, manFbx, animController, "Victor Sterling", 1.8f);
+            Sprite victorPortrait = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resources/Portraits/Victor_Sterling.png");
+            SuspectInterrogation victorInterrogation = victorGO.GetComponent<SuspectInterrogation>();
+            if (victorInterrogation != null && victorPortrait != null)
+            {
+                victorInterrogation.suspectPortrait = victorPortrait;
+                EditorUtility.SetDirty(victorInterrogation);
+            }
             Debug.Log($"<color=green>[Suspects] Configured Victor '{victorGO.name}' on open floor at (2.0, 0.0, 33.8) successfully!</color>");
         }
 
@@ -670,6 +677,13 @@ public class Case2LabSetup : EditorWindow
             elenaGO.transform.rotation = Quaternion.Euler(0, 210, 0);
             elenaGO.transform.localScale = Vector3.one;
             ConfigureCharacterModel(elenaGO, womanFbx, animController, "Elena Rostova", 1.7f);
+            Sprite elenaPortrait = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resources/Portraits/Elena_Rostova.png");
+            SuspectInterrogation elenaInterrogation = elenaGO.GetComponent<SuspectInterrogation>();
+            if (elenaInterrogation != null && elenaPortrait != null)
+            {
+                elenaInterrogation.suspectPortrait = elenaPortrait;
+                EditorUtility.SetDirty(elenaInterrogation);
+            }
             Debug.Log($"<color=green>[Suspects] Configured Elena '{elenaGO.name}' on open floor at (2.6, 0.0, 34.5) successfully!</color>");
         }
 
@@ -683,12 +697,14 @@ public class Case2LabSetup : EditorWindow
                 if (victorGO != null) sim.suspect1.suspectObject = victorGO.transform;
                 sim.suspect1.chairTarget = chairTarget.transform;
                 sim.suspect1.suspectName = "Victor Sterling";
+                sim.suspect1.suspectPortrait = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resources/Portraits/Victor_Sterling.png");
             }
             if (sim.suspect2 != null)
             {
                 if (elenaGO != null) sim.suspect2.suspectObject = elenaGO.transform;
                 sim.suspect2.chairTarget = chairTarget.transform;
                 sim.suspect2.suspectName = "Elena Rostova";
+                sim.suspect2.suspectPortrait = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resources/Portraits/Elena_Rostova.png");
             }
             EditorUtility.SetDirty(sim);
         }

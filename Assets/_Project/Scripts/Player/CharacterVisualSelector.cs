@@ -76,6 +76,18 @@ public class CharacterVisualSelector : MonoBehaviour
         }
     }
 
+    public void SetCutsceneVisibility(bool visible)
+    {
+        if (visible)
+        {
+            ApplySelectedModel();
+        }
+        else
+        {
+            HideAllModels();
+        }
+    }
+
     private void HideAllModels()
     {
         if (femaleDetective != null) femaleDetective.SetActive(false);

@@ -46,6 +46,9 @@ public class EvidenceCutsceneManager : MonoBehaviour
             videoScreen = videoPanel.GetComponentInChildren<RawImage>(true);
         }
 
+        ResolveSkipButton();
+        EnsureFullscreenVideoLayout();
+
         if (skipVideoBtn != null) 
             skipVideoBtn.onClick.AddListener(SkipVideoToQuiz);
 
@@ -102,7 +105,11 @@ public class EvidenceCutsceneManager : MonoBehaviour
         }
 
         // الخطوة أ: تشغيل فيديو الدليل السينمائي فوراً
-        if (videoPanel != null) videoPanel.SetActive(true);
+        if (videoPanel != null)
+        {
+            videoPanel.SetActive(true);
+            EnsureFullscreenVideoLayout();
+        }
         
         if (videoPlayer != null && evidence != null && evidence.evidenceVideoClip != null)
         {
@@ -139,6 +146,43 @@ public class EvidenceCutsceneManager : MonoBehaviour
     {
         if (videoPlayer != null) videoPlayer.Stop();
         ShowQuizPopup();
+    }
+
+    private void ResolveSkipButton()
+    {
+        if (skipVideoBtn == null && videoPanel != null)
+        {
+            Button[] buttons = videoPanel.GetComponentsInChildren<Button>(true);
+            foreach (Button button in buttons)
+            {
+                if (button.name.ToLowerInvariant().Contains("skip"))
+                {
+                    skipVideoBtn = button;
+                    break;
+                }
+            }
+        }
+
+        if (skipVideoBtn != null)
+        {
+            skipVideoBtn.gameObject.SetActive(true);
+            skipVideoBtn.transform.SetAsLastSibling();
+        }
+    }
+
+    private void EnsureFullscreenVideoLayout()
+    {
+        Stretch(videoPanel != null ? videoPanel.transform as RectTransform : null);
+        Stretch(videoScreen != null ? videoScreen.rectTransform : null);
+    }
+
+    private static void Stretch(RectTransform target)
+    {
+        if (target == null) return;
+        target.anchorMin = Vector2.zero;
+        target.anchorMax = Vector2.one;
+        target.offsetMin = Vector2.zero;
+        target.offsetMax = Vector2.zero;
     }
 
     // الخطوة ب: إظهار لوحة الأسئلة العمودية وتعبئة الخيارات الصحيحة

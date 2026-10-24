@@ -21,7 +21,7 @@ public static class LocalTestBootstrap
 
     private static void Run()
     {
-        PlayerMovement move = Object.FindAnyObjectByType<PlayerMovement>(FindObjectsInactive.Include);
+        PlayerMovement move = FindLocalPlayerMovement();
         Debug.Log("[LocalTest] Scene: " + SceneManager.GetActiveScene().name +
                   " | PlayerMovement found: " + (move != null));
 
@@ -70,5 +70,17 @@ public static class LocalTestBootstrap
         Cursor.visible = false;
 
         Debug.Log("[LocalTest] Ready. Player=" + player.name + " pos=" + player.transform.position);
+    }
+
+    private static PlayerMovement FindLocalPlayerMovement()
+    {
+        PlayerMovement[] players = Object.FindObjectsByType<PlayerMovement>(FindObjectsInactive.Include);
+        foreach (PlayerMovement player in players)
+        {
+            if (player != null && player.GetComponent<RemotePlayerReplica>() == null)
+                return player;
+        }
+
+        return null;
     }
 }

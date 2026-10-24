@@ -1539,10 +1539,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1082484656}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -436.6, y: -94.5}
-  m_SizeDelta: {x: 280.2, y: 298.8}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: -436.59998, y: -94.5}
+  m_SizeDelta: {x: -2055.8, y: -781.2}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &285366948
 MonoBehaviour:
@@ -1763,8 +1763,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -52.4, y: 76.55}
-  m_SizeDelta: {x: 200, y: 50}
+  m_AnchoredPosition: {x: -75.825, y: 84.82}
+  m_SizeDelta: {x: 184.351, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &320138307
 MonoBehaviour:
@@ -1852,7 +1852,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: -52.166588, y: 0, z: 43.472027, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -2993,6 +2993,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainMenuUI
   mainMenuPanel: {fileID: 720458709}
   settingsPanel: {fileID: 2112779764}
+  characterSelectPanel: {fileID: 0}
   lobbyPanel: {fileID: 1020840804}
   quitPanel: {fileID: 773321862}
   startGameBtn: {fileID: 1793667285}
@@ -4205,8 +4206,8 @@ RectTransform:
   m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1082484656}
   - {fileID: 720458710}
+  - {fileID: 1082484656}
   - {fileID: 773321863}
   - {fileID: 1020840805}
   - {fileID: 2112779765}
@@ -4631,7 +4632,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -437.7, y: -95.5}
+  m_AnchoredPosition: {x: -436, y: -95}
   m_SizeDelta: {x: 266.3, y: 300.7}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &825917555
@@ -5161,7 +5162,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1020840805
 RectTransform:
   m_ObjectHideFlags: 0
@@ -5259,10 +5260,6 @@ MonoBehaviour:
   player3Status: {fileID: 1602635257}
   player4Name: {fileID: 2047648086}
   player4Status: {fileID: 87828532}
-  startGameButton: {fileID: 414776766}
-  createRoomButton: {fileID: 1128927161}
-  joinRoomButton: {fileID: 909641055}
-  characterSelectPanel: {fileID: 1082484655}
   fieldDetectiveSprite: {fileID: 21300000, guid: 1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e, type: 3}
   forensicsExpertSprite: {fileID: 21300000, guid: 2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e, type: 3}
   digitalAnalystSprite: {fileID: 21300000, guid: 3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f, type: 3}
@@ -5271,6 +5268,11 @@ MonoBehaviour:
   player2RoleImage: {fileID: 1057033464}
   player3RoleImage: {fileID: 212804888}
   player4RoleImage: {fileID: 1752434364}
+  startGameButton: {fileID: 414776766}
+  createRoomButton: {fileID: 1128927161}
+  joinRoomButton: {fileID: 909641055}
+  characterSelectPanel: {fileID: 1082484655}
+  autoStartWhenRoomFull: 1
 --- !u!1 &1044473354
 GameObject:
   m_ObjectHideFlags: 0
@@ -5626,7 +5628,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1082484656
 RectTransform:
   m_ObjectHideFlags: 0
@@ -5702,7 +5704,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1082484655}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7a02b751df5286b419fdbbc2dc71c14e, type: 3}
   m_Name: 
@@ -6987,7 +6989,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: -45.20977, y: 0, z: 34.77552, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -7443,8 +7445,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -592.7, y: 171.6}
-  m_SizeDelta: {x: 548.5, y: 76.9}
+  m_AnchoredPosition: {x: -581.31464, y: 170}
+  m_SizeDelta: {x: 571.129, y: 76.9}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1683652135
 MonoBehaviour:
@@ -8222,7 +8224,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: -53.90473, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -9357,7 +9359,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: -34.77771, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -9642,10 +9644,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1082484656}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 175.4, y: 157.1}
-  m_SizeDelta: {x: 432.2, y: 268.6}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 172, y: 156}
+  m_SizeDelta: {x: -1903.8, y: -811.4}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2134622740
 MonoBehaviour:

@@ -94,6 +94,12 @@ public class UIManager : MonoBehaviour
                 interr.gameObject.SetActive(false);
             }
         }
+
+        Canvas mainCanvas = GetMainCanvas();
+        if (mainCanvas != null && mainCanvas.GetComponent<ResponsiveCanvasLayout>() == null)
+        {
+            mainCanvas.gameObject.AddComponent<ResponsiveCanvasLayout>();
+        }
     }
 
     public Canvas GetMainCanvas()

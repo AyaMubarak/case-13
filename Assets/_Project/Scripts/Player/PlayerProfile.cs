@@ -13,6 +13,9 @@ public class PlayerProfile : MonoBehaviour
     public static PlayerProfile LocalInstance => LocalPlayer;
     public DetectiveRole CurrentRole => currentRole;
 
+    /// <summary>Used briefly while creating visual replicas of other Photon players.</summary>
+    public static bool SuppressLocalRegistration { get; set; }
+
     public event Action OnProfileChanged;
 
     [Header("Agent Identity")]
@@ -26,6 +29,9 @@ public class PlayerProfile : MonoBehaviour
 
     private void Awake()
     {
+        if (SuppressLocalRegistration)
+            return;
+
         if (LocalPlayer != null && LocalPlayer != this)
         {
             Destroy(gameObject);

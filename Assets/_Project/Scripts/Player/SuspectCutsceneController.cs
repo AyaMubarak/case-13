@@ -8,6 +8,14 @@ public class SeparateInterrogationManager : MonoBehaviour
 {
     public static SeparateInterrogationManager Instance { get; private set; }
 
+    private static readonly int IsWalking = Animator.StringToHash("isWalking");
+    private static readonly int Speed = Animator.StringToHash("Speed");
+    private static readonly int Velocity = Animator.StringToHash("Velocity");
+    private static readonly int ReachChair = Animator.StringToHash("ReachChair");
+    private static readonly int SittingState = Animator.StringToHash("Base Layer.sitting");
+    private const string VictorPortraitResourcePath = "Portraits/Victor_Sterling";
+    private const string ElenaPortraitResourcePath = "Portraits/Elena_Rostova";
+
     [System.Serializable]
     public class SuspectData
     {
@@ -66,6 +74,7 @@ public class SeparateInterrogationManager : MonoBehaviour
     private readonly Quaternion chairSeatRotation = Quaternion.Euler(0f, 0f, 0f);
 
     private readonly System.Collections.Generic.List<Renderer> disabledPlayerRenderers = new System.Collections.Generic.List<Renderer>();
+    private readonly System.Collections.Generic.List<Renderer> suppressedDuplicateRenderers = new System.Collections.Generic.List<Renderer>();
 
     private int currentSuspectTurn = 1;
     private bool playerSetupComplete = false;
@@ -76,6 +85,9 @@ public class SeparateInterrogationManager : MonoBehaviour
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
+
+        AssignVictorPortrait();
+        AssignElenaPortrait();
 
         // إخفاء زر أقوال الاستجواب في البداية حتى ينتهي المتهمان
         if (btnOpenTranscripts != null)
@@ -104,11 +116,7 @@ public class SeparateInterrogationManager : MonoBehaviour
         if (suspect2.suspectCamera != null && suspect2.suspectCamera != Camera.main) 
             suspect2.suspectCamera.gameObject.SetActive(false);
 
-        if (!keepSuspectsVisibleInitially)
-        {
-            if (suspect1.suspectObject != null) suspect1.suspectObject.gameObject.SetActive(false);
-            if (suspect2.suspectObject != null) suspect2.suspectObject.gameObject.SetActive(false);
-        }
+        HideAllSuspects();
     }
 
     private void DisablePlayOnAwake(SuspectData suspect)
@@ -118,35 +126,44 @@ public class SeparateInterrogationManager : MonoBehaviour
         if (suspect.suspectVoiceAudio != null) { suspect.suspectVoiceAudio.playOnAwake = false; suspect.suspectVoiceAudio.Stop(); }
     }
 
+    private void AssignElenaPortrait()
+    {
+        Sprite portrait = Resources.Load<Sprite>(ElenaPortraitResourcePath);
+        if (portrait == null || suspect2 == null) return;
+
+        suspect2.suspectPortrait = portrait;
+
+        if (suspect2.suspectObject != null)
+        {
+            SuspectInterrogation interrogation = suspect2.suspectObject.GetComponent<SuspectInterrogation>();
+            if (interrogation != null) interrogation.suspectPortrait = portrait;
+        }
+    }
+
+    private void AssignVictorPortrait()
+    {
+        Sprite portrait = Resources.Load<Sprite>(VictorPortraitResourcePath);
+        if (portrait == null || suspect1 == null) return;
+
+        suspect1.suspectPortrait = portrait;
+
+        if (suspect1.suspectObject != null)
+        {
+            SuspectInterrogation interrogation = suspect1.suspectObject.GetComponent<SuspectInterrogation>();
+            if (interrogation != null) interrogation.suspectPortrait = portrait;
+        }
+    }
+
     void Start()
     {
         InitializeSuspect(suspect1);
         InitializeSuspect(suspect2);
 
+        AlignInterrogationChair();
         ResolveChairTarget(suspect1);
         ResolveChairTarget(suspect2);
 
-        if (keepSuspectsVisibleInitially)
-        {
-            // إظهار المتهمين فوراً في المشهد والتأكد من إمكانية تفاعل اللاعب معهما
-            if (suspect1.suspectObject != null)
-            {
-                suspect1.suspectObject.gameObject.SetActive(true);
-                suspect1.isWaitingForInteraction = true;
-            }
-            if (suspect2.suspectObject != null)
-            {
-                suspect2.suspectObject.gameObject.SetActive(true);
-                suspect2.isWaitingForInteraction = true;
-            }
-            playerSetupComplete = true;
-            suspectsStarted = true;
-        }
-        else
-        {
-            if (suspect1.suspectObject != null) suspect1.suspectObject.gameObject.SetActive(false);
-            if (suspect2.suspectObject != null) suspect2.suspectObject.gameObject.SetActive(false);
-        }
+        HideAllSuspects();
 
         // الاشتراك في حدث اكتمال جمع الـ 5 أدلة
         EvidenceManager.OnAllEvidenceCollected -= OnAllEvidenceGathered;
@@ -175,6 +192,50 @@ public class SeparateInterrogationManager : MonoBehaviour
         }
     }
 
+    private void AlignInterrogationChair()
+    {
+        GameObject chair = GameObject.Find("Interrogation_Lab_Chair");
+        GameObject desk = GameObject.Find("Interrogation_Lab_Desk");
+        GameObject target = GameObject.Find("ChairTarget");
+
+        if (chair == null || desk == null) return;
+
+        Vector3 chairToDesk = desk.transform.position - chair.transform.position;
+        chairToDesk.y = 0f;
+        if (chairToDesk.sqrMagnitude < 0.001f) return;
+
+        Quaternion facingDesk = Quaternion.LookRotation(chairToDesk);
+        chair.transform.rotation = facingDesk;
+
+        if (target != null)
+        {
+            target.transform.position = chair.transform.position;
+            target.transform.rotation = facingDesk;
+        }
+    }
+
+    private void HideAllSuspects()
+    {
+        if (suspect1 != null && suspect1.suspectObject != null)
+        {
+            suspect1.suspectObject.gameObject.SetActive(false);
+        }
+
+        if (suspect2 != null && suspect2.suspectObject != null)
+        {
+            suspect2.suspectObject.gameObject.SetActive(false);
+        }
+    }
+
+    private void HideOtherSuspect(SuspectData activeSuspect)
+    {
+        SuspectData otherSuspect = activeSuspect == suspect1 ? suspect2 : suspect1;
+        if (otherSuspect != null && otherSuspect.suspectObject != null)
+        {
+            otherSuspect.suspectObject.gameObject.SetActive(false);
+        }
+    }
+
     private void OnDestroy()
     {
         EvidenceManager.OnAllEvidenceCollected -= OnAllEvidenceGathered;
@@ -191,6 +252,12 @@ public class SeparateInterrogationManager : MonoBehaviour
     {
         if (suspect.suspectObject != null)
         {
+            var legacyController = suspect.suspectObject.GetComponent<PoliceSceneManager>();
+            if (legacyController != null)
+            {
+                legacyController.enabled = false;
+            }
+
             suspect.agent = suspect.suspectObject.GetComponent<NavMeshAgent>();
             suspect.animator = suspect.suspectObject.GetComponentInChildren<Animator>();
             suspect.suspectCollider = suspect.suspectObject.GetComponent<Collider>();
@@ -249,6 +316,8 @@ public class SeparateInterrogationManager : MonoBehaviour
 
     void StartSuspectTurn(SuspectData suspect)
     {
+        HideOtherSuspect(suspect);
+
         if (suspect.suspectObject != null)
         {
             Vector3 pos = suspect.suspectObject.position;
@@ -273,6 +342,7 @@ public class SeparateInterrogationManager : MonoBehaviour
 
         if (target.isWaitingForInteraction)
         {
+            HideOtherSuspect(target);
             isInterrogating = true;
             target.isWaitingForInteraction = false;
             target.actionTime = Time.time;
@@ -313,9 +383,9 @@ public class SeparateInterrogationManager : MonoBehaviour
 
             if (target.animator != null)
             {
-                target.animator.SetBool("isWalking", true);
-                target.animator.SetFloat("Speed", 1.5f);
-                target.animator.SetFloat("Velocity", 1.5f);
+                target.animator.SetBool(IsWalking, true);
+                target.animator.SetFloat(Speed, 1.5f);
+                target.animator.SetFloat(Velocity, 1.5f);
             }
 
             if (!usedNavMesh)
@@ -457,14 +527,25 @@ public class SeparateInterrogationManager : MonoBehaviour
 
             if (suspect.animator != null)
             {
-                suspect.animator.SetBool("isWalking", false);
-                suspect.animator.SetFloat("Speed", 0f);
-                suspect.animator.SetFloat("Velocity", 0f);
-                suspect.animator.SetTrigger("ReachChair");
+                SeatSuspect(suspect.animator);
             }
 
             ActivateSuspectCamera(suspectIndex);
             StartCoroutine(PlayDialogueSequence(suspect));
+        }
+    }
+
+    private static void SeatSuspect(Animator animator)
+    {
+        animator.SetBool(IsWalking, false);
+        animator.SetFloat(Speed, 0f);
+        animator.SetFloat(Velocity, 0f);
+        animator.ResetTrigger(ReachChair);
+        animator.SetTrigger(ReachChair);
+
+        if (animator.HasState(0, SittingState))
+        {
+            animator.Play(SittingState, 0, 0f);
         }
     }
 
@@ -482,6 +563,7 @@ public class SeparateInterrogationManager : MonoBehaviour
 
         // إخفاء مجسم اللاعب بالكامل أثناء مشهد الاستجواب لمنع وقوفه أمام الكاميرا
         SetPlayerCutsceneMode(true);
+        HideDuplicateCharacterModels(targetSuspect);
 
         // إخفاء المتهم الآخر تماماً لمنع ظهوره واقفاً في خلفية المشهد
         if (otherSuspect != null && otherSuspect.suspectObject != null)
@@ -510,41 +592,89 @@ public class SeparateInterrogationManager : MonoBehaviour
     private void SetPlayerCutsceneMode(bool inCutscene)
     {
         GameObject player = GameObject.FindWithTag("Player");
-        if (player == null)
+        var profile = Object.FindAnyObjectByType<PlayerProfile>(FindObjectsInactive.Include);
+        var movement = Object.FindAnyObjectByType<PlayerMovement>(FindObjectsInactive.Include);
+
+        if (player == null && profile != null)
         {
-            var pp = Object.FindAnyObjectByType<PlayerProfile>(FindObjectsInactive.Include);
-            if (pp != null) player = pp.gameObject;
+            player = profile.gameObject;
         }
-        if (player == null)
+        if (player == null && movement != null)
         {
-            var pm = Object.FindAnyObjectByType<PlayerMovement>(FindObjectsInactive.Include);
-            if (pm != null) player = pm.gameObject;
+            player = movement.gameObject;
         }
 
+        if (movement != null) movement.enabled = !inCutscene;
         if (player != null)
         {
             var pm = player.GetComponent<PlayerMovement>();
             if (pm != null) pm.enabled = !inCutscene;
+        }
 
-            if (inCutscene)
+        if (inCutscene)
+        {
+            disabledPlayerRenderers.Clear();
+            SetPlayerRenderersVisible(player, false);
+            if (profile != null) SetPlayerRenderersVisible(profile.gameObject, false);
+            if (movement != null) SetPlayerRenderersVisible(movement.gameObject, false);
+            foreach (var selector in Object.FindObjectsByType<CharacterVisualSelector>(FindObjectsInactive.Include))
             {
-                disabledPlayerRenderers.Clear();
-                foreach (var r in player.GetComponentsInChildren<Renderer>(true))
-                {
-                    if (r != null && r.enabled)
-                    {
-                        disabledPlayerRenderers.Add(r);
-                        r.enabled = false;
-                    }
-                }
+                selector.SetCutsceneVisibility(false);
             }
-            else
+        }
+        else
+        {
+            foreach (var r in disabledPlayerRenderers)
             {
-                foreach (var r in disabledPlayerRenderers)
+                if (r != null && !suppressedDuplicateRenderers.Contains(r)) r.enabled = true;
+            }
+            disabledPlayerRenderers.Clear();
+            foreach (var selector in Object.FindObjectsByType<CharacterVisualSelector>(FindObjectsInactive.Include))
+            {
+                selector.SetCutsceneVisibility(true);
+            }
+        }
+    }
+
+    private void SetPlayerRenderersVisible(GameObject playerRoot, bool visible)
+    {
+        if (playerRoot == null) return;
+
+        foreach (var renderer in playerRoot.GetComponentsInChildren<Renderer>(true))
+        {
+            if (visible)
+            {
+                renderer.enabled = true;
+            }
+            else if (renderer.enabled && !disabledPlayerRenderers.Contains(renderer))
+            {
+                disabledPlayerRenderers.Add(renderer);
+                renderer.enabled = false;
+            }
+        }
+    }
+
+    private void HideDuplicateCharacterModels(SuspectData activeSuspect)
+    {
+        if (activeSuspect == null || activeSuspect.suspectObject == null || activeSuspect.animator == null) return;
+
+        RuntimeAnimatorController activeController = activeSuspect.animator.runtimeAnimatorController;
+        if (activeController == null) return;
+
+        foreach (var animator in Object.FindObjectsByType<Animator>(FindObjectsInactive.Include))
+        {
+            if (animator == null || animator.runtimeAnimatorController != activeController) continue;
+            if (animator.transform.IsChildOf(activeSuspect.suspectObject)) continue;
+            if (suspect1 != null && suspect1.suspectObject != null && animator.transform.IsChildOf(suspect1.suspectObject)) continue;
+            if (suspect2 != null && suspect2.suspectObject != null && animator.transform.IsChildOf(suspect2.suspectObject)) continue;
+
+            foreach (var renderer in animator.GetComponentsInChildren<Renderer>(true))
+            {
+                if (!suppressedDuplicateRenderers.Contains(renderer))
                 {
-                    if (r != null) r.enabled = true;
+                    suppressedDuplicateRenderers.Add(renderer);
+                    renderer.enabled = false;
                 }
-                disabledPlayerRenderers.Clear();
             }
         }
     }

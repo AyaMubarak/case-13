@@ -31,6 +31,9 @@ public class CaseIntroCutscene : MonoBehaviour
 
         IsPlaying = true; // قبل أي Start في باقي السكربتات
 
+        EnsureFullscreenLayout();
+        ResolveSkipButton();
+
         if (skipButton != null)
         {
             skipButton.onClick.AddListener(EndCutscene);
@@ -81,7 +84,11 @@ public class CaseIntroCutscene : MonoBehaviour
         // تعطيل حركة اللاعب وأي واجهات أخرى أثناء العرض
         ToggleGameplay(false);
 
-        if (cutsceneUIPanel != null) cutsceneUIPanel.SetActive(true);
+        if (cutsceneUIPanel != null)
+        {
+            cutsceneUIPanel.SetActive(true);
+            EnsureFullscreenLayout();
+        }
 
         if (videoPlayer != null)
         {
@@ -132,5 +139,42 @@ public class CaseIntroCutscene : MonoBehaviour
                 if (script != null) script.enabled = enableState;
             }
         }
+    }
+
+    private void ResolveSkipButton()
+    {
+        if (skipButton == null && cutsceneUIPanel != null)
+        {
+            Button[] buttons = cutsceneUIPanel.GetComponentsInChildren<Button>(true);
+            foreach (Button button in buttons)
+            {
+                if (button.name.ToLowerInvariant().Contains("skip"))
+                {
+                    skipButton = button;
+                    break;
+                }
+            }
+        }
+
+        if (skipButton != null)
+        {
+            skipButton.gameObject.SetActive(true);
+            skipButton.transform.SetAsLastSibling();
+        }
+    }
+
+    private void EnsureFullscreenLayout()
+    {
+        Stretch(cutsceneUIPanel != null ? cutsceneUIPanel.transform as RectTransform : null);
+        Stretch(videoDisplay != null ? videoDisplay.rectTransform : null);
+    }
+
+    private static void Stretch(RectTransform target)
+    {
+        if (target == null) return;
+        target.anchorMin = Vector2.zero;
+        target.anchorMax = Vector2.one;
+        target.offsetMin = Vector2.zero;
+        target.offsetMax = Vector2.zero;
     }
 }

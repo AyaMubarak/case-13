@@ -25,7 +25,16 @@ public static class DiagnoseSuspects
         var scene = EditorSceneManager.GetActiveScene();
         Debug.Log($"<color=yellow>=== SUSPECT DIAGNOSTIC REPORT (Scene: {scene.name}) ===</color>");
 
-        GameObject[] allObjects = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        // MainMenu intentionally contains no player, suspects, or interrogation
+        // manager. Do not report that normal menu scene as a broken gameplay scene.
+        if (scene.name == "MainMenu")
+        {
+            Debug.Log("<color=cyan>[INFO]</color> MainMenu is a UI-only scene; suspect diagnostics are skipped. Open Case02_Main to diagnose suspects.");
+            Debug.Log("<color=yellow>=== END DIAGNOSTIC REPORT ===</color>");
+            return;
+        }
+
+        GameObject[] allObjects = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include);
         Debug.Log($"Total GameObjects in scene: {allObjects.Length}");
 
         var playerMovement = Object.FindAnyObjectByType<PlayerMovement>(FindObjectsInactive.Include);
