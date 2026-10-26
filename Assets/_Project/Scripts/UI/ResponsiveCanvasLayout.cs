@@ -33,7 +33,7 @@ public class ResponsiveCanvasLayout : MonoBehaviour
         if (GetComponent<GraphicRaycaster>() == null)
             gameObject.AddComponent<GraphicRaycaster>();
 
-        if (EventSystem.current == null && FindObjectsByType<EventSystem>(FindObjectsInactive.Include).Length == 0)
+        if (EventSystem.current == null && FindObjectsByType<EventSystem>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length == 0)
         {
             GameObject eventSystemObject = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
             DontDestroyOnLoad(eventSystemObject);

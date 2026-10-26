@@ -348,7 +348,8 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
             if (roleImages[i] != null)
             {
                 roleImages[i].sprite = null;
-                roleImages[i].enabled = false;
+                // Keep the covers over the names printed into the background artwork.
+                roleImages[i].enabled = true;
             }
         }
 

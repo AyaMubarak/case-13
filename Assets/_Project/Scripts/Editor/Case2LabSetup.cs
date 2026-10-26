@@ -70,7 +70,7 @@ public class Case2LabSetup : EditorWindow
         Debug.Log("<color=cyan>[LabSetup] Starting Case 2 Sci-Fi Lab Transformation...</color>");
 
         // 3. Safely preserve Evidence items before removing old environment
-        var allEvidence = Object.FindObjectsByType<Evidence>(FindObjectsInactive.Include);
+        var allEvidence = Object.FindObjectsByType<Evidence>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var ev in allEvidence)
         {
             if (ev != null)
@@ -344,7 +344,7 @@ public class Case2LabSetup : EditorWindow
         }
 
         // Suspects (Victor Sterling & Elena Rostova) firmly on the floor at Y=0.0
-        var allPSM = Object.FindObjectsByType<PoliceSceneManager>(FindObjectsInactive.Include);
+        var allPSM = Object.FindObjectsByType<PoliceSceneManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var psm in allPSM)
         {
             string pName = psm.gameObject.name.ToLower();
@@ -571,7 +571,7 @@ public class Case2LabSetup : EditorWindow
         if (chairObj == null) chairObj = GameObject.Find("Office Chair Variant");
         if (chairObj == null)
         {
-            foreach (var go in Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include))
+            foreach (var go in Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 if (go.name.ToLower().Contains("chair"))
                 {
@@ -607,7 +607,7 @@ public class Case2LabSetup : EditorWindow
         if (victorGO == null) victorGO = GameObject.Find("Evan");
         if (victorGO == null)
         {
-            foreach (var si in Object.FindObjectsByType<SuspectInterrogation>(FindObjectsInactive.Include))
+            foreach (var si in Object.FindObjectsByType<SuspectInterrogation>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 if (si.gameObject.name.ToLower().Contains("victor") || si.gameObject.name.ToLower().Contains("evan") ||
                     (!string.IsNullOrEmpty(si.suspectName) && (si.suspectName.ToLower().Contains("victor") || si.suspectName.ToLower().Contains("evan"))))
@@ -651,7 +651,7 @@ public class Case2LabSetup : EditorWindow
         if (elenaGO == null) elenaGO = GameObject.Find("Nora");
         if (elenaGO == null)
         {
-            foreach (var si in Object.FindObjectsByType<SuspectInterrogation>(FindObjectsInactive.Include))
+            foreach (var si in Object.FindObjectsByType<SuspectInterrogation>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 if (si.gameObject.name.ToLower().Contains("elena") || si.gameObject.name.ToLower().Contains("nora") ||
                     (!string.IsNullOrEmpty(si.suspectName) && (si.suspectName.ToLower().Contains("elena") || si.suspectName.ToLower().Contains("nora"))))
@@ -1079,7 +1079,7 @@ public class Case2LabSetup : EditorWindow
 
     private static void PlaceEvidenceInScene(string evidenceID, Vector3 pos, Quaternion rot, string eliminatesSuspect = null, string finding = null)
     {
-        var evidenceComponents = Object.FindObjectsByType<Evidence>(FindObjectsInactive.Include);
+        var evidenceComponents = Object.FindObjectsByType<Evidence>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var ev in evidenceComponents)
         {
             if (ev.evidenceID == evidenceID)

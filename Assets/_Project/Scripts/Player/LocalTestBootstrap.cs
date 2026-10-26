@@ -21,6 +21,9 @@ public static class LocalTestBootstrap
 
     private static void Run()
     {
+        string sceneName = SceneManager.GetActiveScene().name;
+        if (sceneName == "MainMenu" || sceneName == "Lobby") return;
+
         PlayerMovement move = FindLocalPlayerMovement();
         Debug.Log("[LocalTest] Scene: " + SceneManager.GetActiveScene().name +
                   " | PlayerMovement found: " + (move != null));
@@ -74,7 +77,7 @@ public static class LocalTestBootstrap
 
     private static PlayerMovement FindLocalPlayerMovement()
     {
-        PlayerMovement[] players = Object.FindObjectsByType<PlayerMovement>(FindObjectsInactive.Include);
+        PlayerMovement[] players = Object.FindObjectsByType<PlayerMovement>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (PlayerMovement player in players)
         {
             if (player != null && player.GetComponent<RemotePlayerReplica>() == null)

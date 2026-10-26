@@ -9,7 +9,12 @@ public static class DiagnoseSuspects
 {
     static DiagnoseSuspects()
     {
-        EditorApplication.delayCall += RunDiagnosis;
+        EditorApplication.delayCall += () =>
+        {
+            string sceneName = EditorSceneManager.GetActiveScene().name;
+            if (sceneName == "Case01_Main" || sceneName == "Case02_Main")
+                RunDiagnosis();
+        };
     }
 
     [MenuItem("Case 2 Setup/FIX SUSPECTS: On Floor & Hidden Until All Evidences Collected")]
@@ -34,7 +39,7 @@ public static class DiagnoseSuspects
             return;
         }
 
-        GameObject[] allObjects = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include);
+        GameObject[] allObjects = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         Debug.Log($"Total GameObjects in scene: {allObjects.Length}");
 
         var playerMovement = Object.FindAnyObjectByType<PlayerMovement>(FindObjectsInactive.Include);

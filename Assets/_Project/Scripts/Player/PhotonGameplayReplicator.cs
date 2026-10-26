@@ -80,7 +80,7 @@ public class PhotonGameplayReplicator : MonoBehaviourPunCallbacks, IOnEventCallb
 
     private void ResolveLocalPlayer()
     {
-        PlayerMovement[] players = FindObjectsByType<PlayerMovement>(FindObjectsInactive.Exclude);
+        PlayerMovement[] players = FindObjectsByType<PlayerMovement>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         foreach (PlayerMovement player in players)
         {
             if (player.GetComponent<RemotePlayerReplica>() == null)

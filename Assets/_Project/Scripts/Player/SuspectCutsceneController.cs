@@ -617,7 +617,7 @@ public class SeparateInterrogationManager : MonoBehaviour
             SetPlayerRenderersVisible(player, false);
             if (profile != null) SetPlayerRenderersVisible(profile.gameObject, false);
             if (movement != null) SetPlayerRenderersVisible(movement.gameObject, false);
-            foreach (var selector in Object.FindObjectsByType<CharacterVisualSelector>(FindObjectsInactive.Include))
+            foreach (var selector in Object.FindObjectsByType<CharacterVisualSelector>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 selector.SetCutsceneVisibility(false);
             }
@@ -629,7 +629,7 @@ public class SeparateInterrogationManager : MonoBehaviour
                 if (r != null && !suppressedDuplicateRenderers.Contains(r)) r.enabled = true;
             }
             disabledPlayerRenderers.Clear();
-            foreach (var selector in Object.FindObjectsByType<CharacterVisualSelector>(FindObjectsInactive.Include))
+            foreach (var selector in Object.FindObjectsByType<CharacterVisualSelector>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 selector.SetCutsceneVisibility(true);
             }
@@ -661,7 +661,7 @@ public class SeparateInterrogationManager : MonoBehaviour
         RuntimeAnimatorController activeController = activeSuspect.animator.runtimeAnimatorController;
         if (activeController == null) return;
 
-        foreach (var animator in Object.FindObjectsByType<Animator>(FindObjectsInactive.Include))
+        foreach (var animator in Object.FindObjectsByType<Animator>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
             if (animator == null || animator.runtimeAnimatorController != activeController) continue;
             if (animator.transform.IsChildOf(activeSuspect.suspectObject)) continue;

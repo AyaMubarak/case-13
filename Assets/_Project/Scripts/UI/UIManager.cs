@@ -110,7 +110,7 @@ public class UIManager : MonoBehaviour
             if (c != null) return c;
         }
 
-        Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Include);
+        Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var c in canvases)
         {
             if (c.gameObject.name != "MobileControls" && (inventoryPanel == null || c.gameObject != inventoryPanel) && (endGamePanel == null || c.gameObject != endGamePanel))

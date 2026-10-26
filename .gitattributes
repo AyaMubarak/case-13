@@ -169,3 +169,8 @@ Packages/packages-lock.json linguist-generated
 
 # Exceptions for .asset files such as lightning pre-baking
 LightingData.asset     binary
+
+# These assets use Unity's binary serialization; newline conversion corrupts them.
+Assets/_Project/Scenes/Case02_Main.unity binary
+"Assets/_Recovery/0 (5).unity" binary
+Assets/_Project/Scenes/**/NavMesh-*.asset binary

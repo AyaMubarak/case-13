@@ -7,7 +7,7 @@ public static class MissingScriptCleaner
     [MenuItem("Tools/Detect & Clean Missing Scripts")]
     public static void CleanMissingScripts()
     {
-        GameObject[] allObjects = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include);
+        GameObject[] allObjects = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         int totalMissingCount = 0;
         int objectsWithMissingCount = 0;
 

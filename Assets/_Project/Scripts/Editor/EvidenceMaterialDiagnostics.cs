@@ -130,7 +130,7 @@ public static class EvidenceMaterialDiagnostics
 
     private static void AssignMaterialsToSceneEvidence(string materialsFolder)
     {
-        var evidenceObjects = Object.FindObjectsByType<Evidence>(FindObjectsInactive.Include);
+        var evidenceObjects = Object.FindObjectsByType<Evidence>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var ev in evidenceObjects)
         {
             var renderers = ev.GetComponentsInChildren<Renderer>(true);

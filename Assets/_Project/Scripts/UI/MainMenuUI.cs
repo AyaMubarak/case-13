@@ -40,7 +40,7 @@ public class MainMenuUI : MonoBehaviour
     {
         Canvas[] canvases = GetComponentsInParent<Canvas>(true);
         if (canvases == null || canvases.Length == 0)
-            canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Include);
+            canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
         foreach (Canvas canvas in canvases)
         {
