@@ -26,12 +26,15 @@ public class SettingsManager : MonoBehaviour
     private void OnEnable()
     {
         LoadSettings();
-        ConfigureResponsiveLayout();
+        if (difficultyDropdown != null)
+            difficultyDropdown.onValueChanged.AddListener(OnDifficultyChanged);
     }
 
-    private void Start()
+    private void OnDisable()
     {
-        ConfigureResponsiveLayout();
+        if (difficultyDropdown != null)
+            difficultyDropdown.onValueChanged.RemoveListener(OnDifficultyChanged);
+        PlayerPrefs.Save();
     }
 
     public void LoadSettings()
@@ -41,11 +44,12 @@ public class SettingsManager : MonoBehaviour
         float sfx = PlayerPrefs.GetFloat("Settings_SFX", 0.8f);
         int difficulty = PlayerPrefs.GetInt("Settings_Difficulty", 0);
 
-        if (masterSlider != null) { masterSlider.value = master; UpdateText(masterPercentText, master); }
-        if (musicSlider != null) { musicSlider.value = music; UpdateText(musicPercentText, music); }
-        if (sfxSlider != null) { sfxSlider.value = sfx; UpdateText(sfxPercentText, sfx); }
-        if (difficultyDropdown != null) difficultyDropdown.value = difficulty;
-        if (invertYToggle != null) invertYToggle.isOn = PlayerPrefs.GetInt("Settings_InvertY", 0) == 1;
+        if (masterSlider != null) { masterSlider.SetValueWithoutNotify(master); UpdateText(masterPercentText, master); }
+        if (musicSlider != null) { musicSlider.SetValueWithoutNotify(music); UpdateText(musicPercentText, music); }
+        if (sfxSlider != null) { sfxSlider.SetValueWithoutNotify(sfx); UpdateText(sfxPercentText, sfx); }
+        if (difficultyDropdown != null) difficultyDropdown.SetValueWithoutNotify(difficulty);
+        if (invertYToggle != null) invertYToggle.SetIsOnWithoutNotify(PlayerPrefs.GetInt("Settings_InvertY", 0) == 1);
+        AudioListener.volume = master;
     }
 
     public void OnMasterChanged(float val)
@@ -84,28 +88,4 @@ public class SettingsManager : MonoBehaviour
         if (txt != null) txt.text = Mathf.RoundToInt(val * 100f) + "%";
     }
 
-    private void ConfigureResponsiveLayout()
-    {
-        if (invertYToggle == null) return;
-
-        RectTransform toggleRect = invertYToggle.transform as RectTransform;
-        if (toggleRect == null) return;
-
-        // The authored toggle was scaled to 176% with a 556px hit box, which put it outside
-        // the dossier panel on tablets and intercepted taps meant for other controls.
-        toggleRect.localScale = Vector3.one;
-        toggleRect.sizeDelta = new Vector2(120f, 54f);
-        toggleRect.anchoredPosition = new Vector2(410f, 8f);
-
-        ResizeToggleGraphic(invertYToggle.targetGraphic != null ? invertYToggle.targetGraphic.rectTransform : null, new Vector2(120f, 54f));
-        ResizeToggleGraphic(invertYToggle.graphic != null ? invertYToggle.graphic.rectTransform : null, new Vector2(42f, 42f));
-        Canvas.ForceUpdateCanvases();
-    }
-
-    private static void ResizeToggleGraphic(RectTransform graphic, Vector2 size)
-    {
-        if (graphic == null) return;
-        graphic.localScale = Vector3.one;
-        graphic.sizeDelta = size;
-    }
 }
