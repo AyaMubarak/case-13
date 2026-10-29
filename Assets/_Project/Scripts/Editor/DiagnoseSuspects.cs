@@ -25,6 +25,12 @@ public static class DiagnoseSuspects
         var scene = EditorSceneManager.GetActiveScene();
         Debug.Log($"<color=yellow>=== SUSPECT DIAGNOSTIC REPORT (Scene: {scene.name}) ===</color>");
 
+        if (!scene.IsValid() || !scene.isLoaded || scene.rootCount == 0)
+        {
+            Debug.LogWarning("[DIAGNOSIS SKIPPED] Case02 scene failed to load or has no root objects.");
+            return;
+        }
+
         // MainMenu intentionally contains no player, suspects, or interrogation
         // manager. Do not report that normal menu scene as a broken gameplay scene.
         if (scene.name == "MainMenu")

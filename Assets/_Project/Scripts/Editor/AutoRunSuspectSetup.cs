@@ -12,6 +12,8 @@ public static class AutoRunSuspectSetup
     private static void RunOnce()
     {
         var activeScene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
+        if (!activeScene.IsValid() || !activeScene.isLoaded || activeScene.rootCount == 0)
+            return;
         if (!activeScene.name.Contains("02")) return;
 
         GameObject victor = GameObject.Find("NPC_Victor");
