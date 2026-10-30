@@ -11,6 +11,12 @@ public static class AutoRunSuspectSetup
 
     private static void RunOnce()
     {
+        // This is an Editor-only scene migration tool. Never run it while the
+        // game is playing: SetupNewSuspectModels marks/saves the scene and
+        // Unity throws InvalidOperationException during Play Mode.
+        if (Application.isPlaying)
+            return;
+
         var activeScene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
         if (!activeScene.IsValid() || !activeScene.isLoaded || activeScene.rootCount == 0)
             return;
@@ -19,11 +25,9 @@ public static class AutoRunSuspectSetup
         GameObject victor = GameObject.Find("NPC_Victor");
         bool needsSetup = false;
 
-        GameObject chair = GameObject.Find("Interrogation_Lab_Chair");
-        if (chair != null && Mathf.Abs(chair.transform.eulerAngles.y - 270f) > 5f)
-        {
-            needsSetup = true;
-        }
+        // The Case 2 chair is deliberately positioned by hand in the scene.
+        // Do not use its rotation as a reason to run the migration again:
+        // the old check expected Y=270 and overwrote the designer's Y=180.
 
         if (victor == null)
         {
@@ -48,5 +52,10 @@ public static class AutoRunSuspectSetup
             Debug.Log("<color=cyan>[AutoSetup] Calibrating and setting up Suspect Models for Case 02...</color>");
             Case2LabSetup.SetupNewSuspectModels(false);
         }
+
+        // Case 2 has its own interrogation voices. Repair the serialized
+        // AudioSource clips whenever this scene is opened, without touching
+        // Case 1.
+        Case2LabSetup.AssignCase2Voices();
     }
 }

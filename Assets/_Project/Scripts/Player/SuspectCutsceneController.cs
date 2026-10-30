@@ -3,6 +3,7 @@ using UnityEngine.AI;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
+using System.Collections.Generic;
 
 public class SeparateInterrogationManager : MonoBehaviour
 {
@@ -70,8 +71,13 @@ public class SeparateInterrogationManager : MonoBehaviour
     public bool keepSuspectsVisibleInitially = false;
 
     // الإحداثيات الدقيقة للكرسي الافتراضي ومحاذاة الجلوس
-    private readonly Vector3 chairSeatPosition = new Vector3(4.2f, 0.0f, 33.25f);
-    private readonly Quaternion chairSeatRotation = Quaternion.Euler(0f, 0f, 0f);
+    // Exact Case 1 sitting pose from the authored suspect placement. Case 2
+    // keeps using its own authored ChairTarget and is not changed by this.
+    private readonly Vector3 chairSeatPosition = new Vector3(1.946f, 0f, -7.78306f);
+    private readonly Quaternion chairSeatRotation = Quaternion.Euler(5.391f, -222.89f, 6.13f);
+    private Transform case2ManualChair;
+    private Vector3 case2ManualChairLocalPosition;
+    private Quaternion case2ManualChairLocalRotation;
 
     private readonly System.Collections.Generic.List<Renderer> disabledPlayerRenderers = new System.Collections.Generic.List<Renderer>();
     private readonly System.Collections.Generic.List<Renderer> suppressedDuplicateRenderers = new System.Collections.Generic.List<Renderer>();
@@ -80,12 +86,15 @@ public class SeparateInterrogationManager : MonoBehaviour
     private bool playerSetupComplete = false;
     private bool suspectsStarted = false;
     private bool isInterrogating = false;
+    private readonly List<AudioSource> mutedBackgroundSources = new List<AudioSource>();
+    private readonly List<bool> previousMuteStates = new List<bool>();
 
     void Awake()
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
 
+        ResolveTranscriptUIReferences();
         AssignVictorPortrait();
         AssignElenaPortrait();
 
@@ -119,11 +128,85 @@ public class SeparateInterrogationManager : MonoBehaviour
         HideAllSuspects();
     }
 
+    private void ResolveTranscriptUIReferences()
+    {
+        if (interrogationLogPanel == null)
+            interrogationLogPanel = FindNamedObject("InterrogationLogPanel", "SuspectInterrogationLog", "FinalConfrontationPanel");
+        if (evanLogText == null)
+            evanLogText = FindTextObject("Txt_EvanStatement", "VictorStatement", "VictorLogText");
+        if (noraLogText == null)
+            noraLogText = FindTextObject("Txt_NoraStatement", "ElenaStatement", "ElenaLogText");
+        if (closeLogBtn == null)
+            closeLogBtn = FindButtonObject("Btn_CloseInterrogationLog", "CloseInterrogationLog", "CloseLog");
+        if (btnOpenTranscripts == null)
+        {
+            foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            {
+                if (t.name == "Btn_OpenTranscripts")
+                {
+                    btnOpenTranscripts = t.gameObject;
+                    break;
+                }
+            }
+        }
+
+        if (btnDossierMobile == null)
+        {
+            foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            {
+                if (t.name == "Btn_Dossier_Mobile")
+                {
+                    btnDossierMobile = t.gameObject;
+                    break;
+                }
+            }
+        }
+
+        // This icon must not be visible before the suspect statements are
+        // completed. It is enabled only by OpenLogPanel/ShowTranscriptButton.
+        if (btnOpenTranscripts != null)
+            btnOpenTranscripts.SetActive(false);
+    }
+
+    private static GameObject FindNamedObject(params string[] names)
+    {
+        foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            foreach (string name in names)
+                if (t.name == name) return t.gameObject;
+        return null;
+    }
+
+    private static TMP_Text FindTextObject(params string[] names)
+    {
+        foreach (TMP_Text text in Object.FindObjectsByType<TMP_Text>(FindObjectsInactive.Include))
+            foreach (string name in names)
+                if (text.name == name) return text;
+        return null;
+    }
+
+    private static Button FindButtonObject(params string[] names)
+    {
+        foreach (Button button in Object.FindObjectsByType<Button>(FindObjectsInactive.Include))
+            foreach (string name in names)
+                if (button.name == name) return button;
+        return null;
+    }
+
     private void DisablePlayOnAwake(SuspectData suspect)
     {
-        if (suspect.detectiveAskMale != null) { suspect.detectiveAskMale.playOnAwake = false; suspect.detectiveAskMale.Stop(); }
-        if (suspect.detectiveAskFemale != null) { suspect.detectiveAskFemale.playOnAwake = false; suspect.detectiveAskFemale.Stop(); }
-        if (suspect.suspectVoiceAudio != null) { suspect.suspectVoiceAudio.playOnAwake = false; suspect.suspectVoiceAudio.Stop(); }
+        ConfigureDialogueSource(suspect != null ? suspect.detectiveAskMale : null);
+        ConfigureDialogueSource(suspect != null ? suspect.detectiveAskFemale : null);
+        ConfigureDialogueSource(suspect != null ? suspect.suspectVoiceAudio : null);
+    }
+
+    private static void ConfigureDialogueSource(AudioSource source)
+    {
+        if (source == null) return;
+        source.playOnAwake = false;
+        source.loop = false;
+        source.spatialBlend = 0f;
+        source.volume = 1f;
+        source.Stop();
     }
 
     private void AssignElenaPortrait()
@@ -131,12 +214,14 @@ public class SeparateInterrogationManager : MonoBehaviour
         Sprite portrait = Resources.Load<Sprite>(ElenaPortraitResourcePath);
         if (portrait == null || suspect2 == null) return;
 
-        suspect2.suspectPortrait = portrait;
+        if (suspect2.suspectPortrait == null)
+            suspect2.suspectPortrait = portrait;
 
         if (suspect2.suspectObject != null)
         {
             SuspectInterrogation interrogation = suspect2.suspectObject.GetComponent<SuspectInterrogation>();
-            if (interrogation != null) interrogation.suspectPortrait = portrait;
+            if (interrogation != null && interrogation.suspectPortrait == null)
+                interrogation.suspectPortrait = portrait;
         }
     }
 
@@ -145,23 +230,43 @@ public class SeparateInterrogationManager : MonoBehaviour
         Sprite portrait = Resources.Load<Sprite>(VictorPortraitResourcePath);
         if (portrait == null || suspect1 == null) return;
 
-        suspect1.suspectPortrait = portrait;
+        if (suspect1.suspectPortrait == null)
+            suspect1.suspectPortrait = portrait;
 
         if (suspect1.suspectObject != null)
         {
             SuspectInterrogation interrogation = suspect1.suspectObject.GetComponent<SuspectInterrogation>();
-            if (interrogation != null) interrogation.suspectPortrait = portrait;
+            if (interrogation != null && interrogation.suspectPortrait == null)
+                interrogation.suspectPortrait = portrait;
         }
     }
 
     void Start()
     {
+        ResolveCase2SuspectReferences();
         InitializeSuspect(suspect1);
         InitializeSuspect(suspect2);
 
-        AlignInterrogationChair();
+        // Case 2 chair/ChairTarget is intentionally authored by hand. Never
+        // rotate or reposition it automatically there.
+        if (!UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02"))
+            AlignInterrogationChair();
         ResolveChairTarget(suspect1);
         ResolveChairTarget(suspect2);
+
+        // Case 2 uses the exact chair pose authored in the scene. Capture it
+        // once and restore it after every frame so no runtime animation,
+        // interaction or legacy setup code can rotate it.
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02"))
+        {
+            GameObject chair = GameObject.Find("Interrogation_Lab_Chair");
+            if (chair != null)
+            {
+                case2ManualChair = chair.transform;
+                case2ManualChairLocalPosition = case2ManualChair.localPosition;
+                case2ManualChairLocalRotation = case2ManualChair.localRotation;
+            }
+        }
 
         HideAllSuspects();
 
@@ -179,6 +284,16 @@ public class SeparateInterrogationManager : MonoBehaviour
     private void ResolveChairTarget(SuspectData suspect)
     {
         if (suspect == null) return;
+
+        // Keep the ChairTarget position/rotation authored in the scene. The
+        // designer can calibrate it manually in the Inspector; runtime only
+        // resolves a missing or clearly invalid reference.
+        if (suspect.chairTarget != null && !IsValidChairTarget(suspect.chairTarget))
+        {
+            suspect.chairTarget.position = chairSeatPosition;
+            suspect.chairTarget.rotation = chairSeatRotation;
+            return;
+        }
         if (suspect.chairTarget == null)
         {
             GameObject ct = GameObject.Find("ChairTarget");
@@ -188,8 +303,81 @@ public class SeparateInterrogationManager : MonoBehaviour
             if (ct != null)
             {
                 suspect.chairTarget = ct.transform;
+                if (!IsValidChairTarget(suspect.chairTarget))
+                {
+                    suspect.chairTarget.position = chairSeatPosition;
+                    suspect.chairTarget.rotation = chairSeatRotation;
+                }
             }
         }
+    }
+
+    private void LateUpdate()
+    {
+        if (case2ManualChair == null) return;
+        case2ManualChair.localPosition = case2ManualChairLocalPosition;
+        case2ManualChair.localRotation = case2ManualChairLocalRotation;
+    }
+
+    private void ResolveCase2SuspectReferences()
+    {
+        if (!UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02")) return;
+
+        if (suspect1 == null) suspect1 = new SuspectData();
+        if (suspect2 == null) suspect2 = new SuspectData();
+        suspect1.suspectName = "Victor Sterling";
+        suspect2.suspectName = "Elena Rostova";
+        if (string.IsNullOrWhiteSpace(suspect1.detectiveDialogueText) || suspect1.detectiveDialogueText.Contains("Evan"))
+            suspect1.detectiveDialogueText = "Victor, your terminal credentials were used during the breach. Explain your access to the laboratory systems.";
+        if (string.IsNullOrWhiteSpace(suspect1.suspectDialogueText) || suspect1.suspectDialogueText.Contains("nothing"))
+            suspect1.suspectDialogueText = "I accessed the terminal for routine diagnostics. I did not authorize the breach.";
+        if (string.IsNullOrWhiteSpace(suspect2.detectiveDialogueText) || suspect2.detectiveDialogueText.Contains("Nora"))
+            suspect2.detectiveDialogueText = "Elena, the chemical records and encrypted transmission both place you inside the restricted lab.";
+        if (string.IsNullOrWhiteSpace(suspect2.suspectDialogueText) || suspect2.suspectDialogueText.Contains("nothing"))
+            suspect2.suspectDialogueText = "I was running my research analysis. Someone else must have used my credentials.";
+
+        if (suspect1.suspectObject == null)
+        {
+            GameObject evan = GameObject.Find("NPC_Victor");
+            if (evan == null) evan = GameObject.Find("NPC_EvanHart");
+            if (evan == null)
+            {
+                foreach (SuspectInterrogation si in Object.FindObjectsByType<SuspectInterrogation>(FindObjectsInactive.Include))
+                    if (si != null && (si.suspectName.Contains("Victor") || si.suspectName.Contains("Evan"))) { evan = si.gameObject; break; }
+            }
+            if (evan != null) suspect1.suspectObject = evan.transform;
+        }
+
+        if (suspect2.suspectObject == null)
+        {
+            GameObject nora = GameObject.Find("NPC_Elena");
+            if (nora == null) nora = GameObject.Find("NPC_NoraBlake");
+            if (nora == null)
+            {
+                foreach (SuspectInterrogation si in Object.FindObjectsByType<SuspectInterrogation>(FindObjectsInactive.Include))
+                    if (si != null && (si.suspectName.Contains("Elena") || si.suspectName.Contains("Nora"))) { nora = si.gameObject; break; }
+            }
+            if (nora != null) suspect2.suspectObject = nora.transform;
+        }
+
+        Transform chair = null;
+        GameObject chairObject = GameObject.Find("ChairTarget");
+        if (chairObject != null) chair = chairObject.transform;
+        if (chair != null)
+        {
+            if (suspect1.chairTarget == null) suspect1.chairTarget = chair;
+            if (suspect2.chairTarget == null) suspect2.chairTarget = chair;
+        }
+
+        Debug.Log($"[Case2] Suspects linked: Victor={(suspect1.suspectObject != null)}, Elena={(suspect2.suspectObject != null)}, Chair={(chair != null)}");
+    }
+
+    private bool IsValidChairTarget(Transform target)
+    {
+        if (target == null) return false;
+        // The old Case 1 scene contains a stale serialized target at extreme
+        // coordinates. Treat it as invalid and restore the known seat pose.
+        return target.position.sqrMagnitude < 10000f && target.position.y > -2f;
     }
 
     private void AlignInterrogationChair()
@@ -342,6 +530,7 @@ public class SeparateInterrogationManager : MonoBehaviour
 
         if (target.isWaitingForInteraction)
         {
+        MuteInterrogationBackgroundAudio();
             HideOtherSuspect(target);
             isInterrogating = true;
             target.isWaitingForInteraction = false;
@@ -530,6 +719,11 @@ public class SeparateInterrogationManager : MonoBehaviour
                 SeatSuspect(suspect.animator);
             }
 
+            // Apply the authored Case 1 pose once more after changing the
+            // animator state. This prevents root motion from leaving the
+            // suspect standing on top of the chair.
+            ApplySeatPose(suspect);
+
             ActivateSuspectCamera(suspectIndex);
             StartCoroutine(PlayDialogueSequence(suspect));
         }
@@ -537,6 +731,8 @@ public class SeparateInterrogationManager : MonoBehaviour
 
     private static void SeatSuspect(Animator animator)
     {
+        if (animator == null) return;
+        animator.applyRootMotion = false;
         animator.SetBool(IsWalking, false);
         animator.SetFloat(Speed, 0f);
         animator.SetFloat(Velocity, 0f);
@@ -547,6 +743,17 @@ public class SeparateInterrogationManager : MonoBehaviour
         {
             animator.Play(SittingState, 0, 0f);
         }
+    }
+
+    private void ApplySeatPose(SuspectData suspect)
+    {
+        if (suspect == null || suspect.suspectObject == null) return;
+
+        Vector3 seatPosition = suspect.chairTarget != null ? suspect.chairTarget.position : chairSeatPosition;
+        Quaternion seatRotation = suspect.chairTarget != null ? suspect.chairTarget.rotation : chairSeatRotation;
+        seatPosition.y = 0f;
+        suspect.suspectObject.position = seatPosition;
+        suspect.suspectObject.rotation = seatRotation;
     }
 
     public void ActivateSuspectCamera(int suspectIndex)
@@ -681,11 +888,16 @@ public class SeparateInterrogationManager : MonoBehaviour
 
     private IEnumerator PlayDialogueSequence(SuspectData suspect)
     {
-        Vector3 finalChairPos = (suspect.chairTarget != null) ? suspect.chairTarget.position : chairSeatPosition;
-        finalChairPos.y = 0f;
-        Quaternion finalChairRot = (suspect.chairTarget != null) ? suspect.chairTarget.rotation : chairSeatRotation;
-        suspect.suspectObject.position = finalChairPos;
-        suspect.suspectObject.rotation = finalChairRot;
+        ApplySeatPose(suspect);
+        if (suspect.animator != null)
+        {
+            SeatSuspect(suspect.animator);
+            // Give the animator one frame to enter the sitting state, then
+            // restore the exact chair pose after any root-motion correction.
+            yield return null;
+            ApplySeatPose(suspect);
+            SeatSuspect(suspect.animator);
+        }
 
         AudioSource detectiveVoice = (PlayerProfile.LocalPlayer != null && PlayerProfile.LocalPlayer.gender == DetectiveGender.Female)
             ? suspect.detectiveAskFemale
@@ -1226,6 +1438,45 @@ public class SeparateInterrogationManager : MonoBehaviour
         }
 
         DeactivateSuspectCamera();
+        RestoreInterrogationBackgroundAudio();
+    }
+
+    private void MuteInterrogationBackgroundAudio()
+    {
+        mutedBackgroundSources.Clear();
+        previousMuteStates.Clear();
+
+        AudioSource[] dialogueSources = {
+            suspect1 != null ? suspect1.detectiveAskMale : null,
+            suspect1 != null ? suspect1.detectiveAskFemale : null,
+            suspect1 != null ? suspect1.suspectVoiceAudio : null,
+            suspect2 != null ? suspect2.detectiveAskMale : null,
+            suspect2 != null ? suspect2.detectiveAskFemale : null,
+            suspect2 != null ? suspect2.suspectVoiceAudio : null
+        };
+
+        foreach (AudioSource source in Object.FindObjectsByType<AudioSource>(FindObjectsInactive.Include))
+        {
+            bool isDialogue = false;
+            foreach (AudioSource allowed in dialogueSources)
+                if (source == allowed) { isDialogue = true; break; }
+            if (isDialogue) continue;
+
+            mutedBackgroundSources.Add(source);
+            previousMuteStates.Add(source.mute);
+            source.mute = true;
+        }
+    }
+
+    private void RestoreInterrogationBackgroundAudio()
+    {
+        for (int i = 0; i < mutedBackgroundSources.Count; i++)
+        {
+            if (mutedBackgroundSources[i] != null)
+                mutedBackgroundSources[i].mute = previousMuteStates[i];
+        }
+        mutedBackgroundSources.Clear();
+        previousMuteStates.Clear();
     }
 
     private void MakeSuspectLeave(SuspectData currentSuspect)

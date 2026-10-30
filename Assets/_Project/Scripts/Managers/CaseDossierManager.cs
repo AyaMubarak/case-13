@@ -50,8 +50,29 @@ public class CaseDossierManager : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        if (Instance != null && Instance != this)
+        {
+            string activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            string existingScene = Instance.gameObject.scene.name;
+            bool enteringDifferentCase = existingScene != activeScene && activeScene.Contains("Case02");
+
+            if (enteringDifferentCase)
+            {
+                Destroy(Instance.gameObject);
+                Instance = this;
+            }
+            else
+            {
+                Destroy(gameObject);
+                return;
+            }
+        }
+        else
+        {
+            Instance = this;
+        }
+
+        LoadCaseSpecificSuspects();
 
         AssignVictorPortrait();
         AssignElenaPortrait();
@@ -76,6 +97,37 @@ public class CaseDossierManager : MonoBehaviour
             manualEliminateBtn.onClick.RemoveAllListeners();
             manualEliminateBtn.onClick.AddListener(EliminateCurrentSuspect);
         }
+    }
+
+    private void LoadCaseSpecificSuspects()
+    {
+        if (!UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02")) return;
+
+        // Case 02 has its own suspect roster. Do not reuse the Case 01
+        // serialized list (Nora/Evan/Marcus/Leo/Sarah).
+        suspects = new List<SuspectProfile>
+        {
+            CreateCase2Suspect("SUS_DAMIAN", "Damian King", "External Security / Access Control", "O+", "Was stationed outside the main security gate.", "Portraits/Damian"),
+            CreateCase2Suspect("SUS_ARTHUR", "Arthur Vale", "Systems Engineer", "A-", "Claims he was working remotely through the lab VPN.", "Portraits/Arthur"),
+            CreateCase2Suspect("SUS_MAYA", "Maya Lin", "Biochemical Researcher", "AB+", "Was assigned to the biochemical research wing.", "Portraits/Maya_Lin"),
+            CreateCase2Suspect("SUS_VICTOR", "Victor Sterling", "Lead Lab Engineer", "B+", "Had terminal encryption credentials and access to the lab systems.", "Portraits/Victor_Sterling"),
+            CreateCase2Suspect("SUS_ELENA", "Elena Rostova", "Senior Research Scientist", "AB-", "Had access to the chemical storage and encryption protocols.", "Portraits/Elena_Rostova")
+        };
+    }
+
+    private static SuspectProfile CreateCase2Suspect(string id, string name, string role, string blood, string alibi, string portraitPath)
+    {
+        return new SuspectProfile
+        {
+            suspectID = id,
+            suspectName = name,
+            roleOrTitle = role,
+            bloodType = blood,
+            alibi = alibi,
+            portrait = Resources.Load<Sprite>(portraitPath),
+            isEliminated = false,
+            eliminationReason = string.Empty
+        };
     }
 
     private void AssignElenaPortrait()
@@ -122,6 +174,7 @@ public class CaseDossierManager : MonoBehaviour
 
     private void Start()
     {
+        ResolveDossierUIReferences();
         InitializeCards();
         if (dossierPanel != null) dossierPanel.SetActive(false);
         if (suspectDetailsPanel != null) suspectDetailsPanel.SetActive(false);
@@ -155,6 +208,120 @@ public class CaseDossierManager : MonoBehaviour
 
         if (finalSuspectsIconBtn != null) finalSuspectsIconBtn.SetActive(false);
         CheckSuspectsCountAndSwitchIcons();
+    }
+
+    private void ResolveDossierUIReferences()
+    {
+        if (dossierPanel == null) dossierPanel = FindUIObject("DossierPanel");
+        if (suspectDetailsPanel == null) suspectDetailsPanel = FindUIObject("SuspectDetailsPanel");
+        if (findingSummaryText == null) findingSummaryText = FindUIText("FindingSummaryText", "EvidenceFindingText");
+        if (detailPortrait == null) detailPortrait = FindUIImageInRoot(suspectDetailsPanel, "Detail_Portrait", "SuspectPortrait_UI", "DetailPortrait");
+        if (detailNameText == null) detailNameText = FindUITextInRoot(suspectDetailsPanel, "Detail_NameText", "DetailName", "DetailNameText");
+        if (detailRoleText == null) detailRoleText = FindUITextInRoot(suspectDetailsPanel, "Detail_RoleText", "DetailRole", "DetailRoleText");
+        if (detailBloodText == null) detailBloodText = FindUITextInRoot(suspectDetailsPanel, "Detail_BloodText", "DetailBlood", "DetailBloodText");
+        if (detailAlibiText == null) detailAlibiText = FindUITextInRoot(suspectDetailsPanel, "Detail_AlibiText", "DetailAlibi", "DetailAlibiText");
+        if (generalDossierIconBtn == null) generalDossierIconBtn = FindUIObject("Btn_Dossier_Mobile");
+        if (finalSuspectsIconBtn == null) finalSuspectsIconBtn = FindUIObject("Btn_FinalSuspects");
+        if (interrogationPromptUI == null) interrogationPromptUI = FindUIObject("InterrogationPrompt");
+
+        if (closeDossierBtn == null) closeDossierBtn = FindUIButton("CloseDossierBtn", "CloseDossier", "Close");
+        if (backToGridBtn == null) backToGridBtn = FindUIButton("BackToGridBtn", "Back", "CloseDetails");
+        if (manualEliminateBtn == null) manualEliminateBtn = FindUIButton("ManualEliminateBtn", "Eliminate", "Accuse");
+
+        if (cardSlots == null || cardSlots.Length == 0 || !HasCardSlot(cardSlots))
+        {
+            cardSlots = Object.FindObjectsByType<SuspectCardUI>(FindObjectsInactive.Include);
+            System.Array.Sort(cardSlots, (a, b) =>
+                string.CompareOrdinal(a != null ? a.name : string.Empty, b != null ? b.name : string.Empty));
+        }
+
+        // Make the dossier cover the actual screen, not the old fixed 1920x1080
+        // rectangle from the source scene.
+        if (dossierPanel != null)
+        {
+            RectTransform rect = dossierPanel.GetComponent<RectTransform>();
+            if (rect != null)
+            {
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+                rect.localScale = Vector3.one;
+            }
+
+            Canvas canvas = dossierPanel.GetComponentInParent<Canvas>(true);
+            if (canvas != null)
+            {
+                CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
+                if (scaler == null) scaler = canvas.gameObject.AddComponent<CanvasScaler>();
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                scaler.referenceResolution = new Vector2(1920f, 1080f);
+                scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+                scaler.matchWidthOrHeight = Screen.height > 0 && (float)Screen.width / Screen.height < 1.5f ? 0f : 0.5f;
+                if (canvas.GetComponent<GraphicRaycaster>() == null)
+                    canvas.gameObject.AddComponent<GraphicRaycaster>();
+            }
+        }
+    }
+
+    private static bool HasCardSlot(SuspectCardUI[] slots)
+    {
+        if (slots == null || slots.Length == 0) return false;
+        foreach (SuspectCardUI slot in slots)
+            if (slot != null) return true;
+        return false;
+    }
+
+    private static GameObject FindUIObject(string objectName)
+    {
+        foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            if (t.name == objectName) return t.gameObject;
+        return null;
+    }
+
+    private static Button FindUIButton(params string[] names)
+    {
+        foreach (Button button in Object.FindObjectsByType<Button>(FindObjectsInactive.Include))
+        {
+            foreach (string name in names)
+                if (button.name.IndexOf(name, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    return button;
+        }
+        return null;
+    }
+
+    private static TMP_Text FindUIText(params string[] names)
+    {
+        foreach (TMP_Text text in Object.FindObjectsByType<TMP_Text>(FindObjectsInactive.Include))
+            foreach (string name in names)
+                if (text.name.Equals(name, System.StringComparison.OrdinalIgnoreCase)) return text;
+        return null;
+    }
+
+    private static Image FindUIImage(params string[] names)
+    {
+        foreach (Image image in Object.FindObjectsByType<Image>(FindObjectsInactive.Include))
+            foreach (string name in names)
+                if (image.name.Equals(name, System.StringComparison.OrdinalIgnoreCase)) return image;
+        return null;
+    }
+
+    private static TMP_Text FindUITextInRoot(GameObject root, params string[] names)
+    {
+        if (root == null) return null;
+        foreach (TMP_Text text in root.GetComponentsInChildren<TMP_Text>(true))
+            foreach (string name in names)
+                if (text.name.Equals(name, System.StringComparison.OrdinalIgnoreCase)) return text;
+        return FindUIText(names);
+    }
+
+    private static Image FindUIImageInRoot(GameObject root, params string[] names)
+    {
+        if (root == null) return null;
+        foreach (Image image in root.GetComponentsInChildren<Image>(true))
+            foreach (string name in names)
+                if (image.name.Equals(name, System.StringComparison.OrdinalIgnoreCase)) return image;
+        return FindUIImage(names);
     }
 
     public void InitializeCards()
@@ -453,19 +620,57 @@ public class CaseDossierManager : MonoBehaviour
         // 1. تنسيق لوحة DossierPanel بالكامل مع خلفية فخمة
         if (dossierPanel != null)
         {
+            Canvas parentCanvas = dossierPanel.GetComponentInParent<Canvas>(true);
             RectTransform pRect = dossierPanel.GetComponent<RectTransform>();
             if (pRect != null)
             {
+                if (parentCanvas != null && dossierPanel.transform.parent != parentCanvas.transform)
+                    dossierPanel.transform.SetParent(parentCanvas.transform, false);
                 pRect.anchorMin = Vector2.zero;
                 pRect.anchorMax = Vector2.one;
+                pRect.pivot = new Vector2(0.5f, 0.5f);
                 pRect.offsetMin = Vector2.zero;
                 pRect.offsetMax = Vector2.zero;
+                pRect.anchoredPosition = Vector2.zero;
+                pRect.sizeDelta = Vector2.zero;
+                pRect.localRotation = Quaternion.identity;
+                pRect.localScale = Vector3.one;
             }
 
             Image panelImg = dossierPanel.GetComponent<Image>();
             if (panelImg != null)
             {
                 panelImg.color = new Color(0.04f, 0.05f, 0.08f, 0.96f);
+            }
+
+            Transform header = dossierPanel.transform.Find("HeaderBar");
+            if (header != null)
+            {
+                RectTransform headerRect = header.GetComponent<RectTransform>();
+                if (headerRect != null)
+                {
+                    headerRect.anchorMin = new Vector2(0f, 1f);
+                    headerRect.anchorMax = new Vector2(1f, 1f);
+                    headerRect.pivot = new Vector2(0.5f, 1f);
+                    headerRect.anchoredPosition = Vector2.zero;
+                    headerRect.sizeDelta = new Vector2(0f, 86f);
+                }
+
+                TMP_Text title = header.GetComponentInChildren<TMP_Text>(true);
+                if (title != null)
+                {
+                    title.text = "<color=#00E5FF><b>CASE DOSSIER</b></color>  <color=#607D8B>//</color>  <color=#B0BEC5>COLLECTED EVIDENCE ARCHIVE</color>";
+                    title.fontSize = 25f;
+                    title.alignment = TextAlignmentOptions.Left;
+                    RectTransform titleRect = title.GetComponent<RectTransform>();
+                    if (titleRect != null)
+                    {
+                        titleRect.anchorMin = new Vector2(0f, 0f);
+                        titleRect.anchorMax = new Vector2(1f, 1f);
+                        titleRect.offsetMin = new Vector2(32f, 0f);
+                        titleRect.offsetMax = new Vector2(-100f, 0f);
+                    }
+                }
             }
         }
 
@@ -495,8 +700,18 @@ public class CaseDossierManager : MonoBehaviour
                 closeRect.anchorMin = new Vector2(1f, 1f);
                 closeRect.anchorMax = new Vector2(1f, 1f);
                 closeRect.pivot = new Vector2(1f, 1f);
-                closeRect.anchoredPosition = new Vector2(-40f, -30f);
-                closeRect.sizeDelta = new Vector2(50f, 50f);
+                closeRect.anchoredPosition = new Vector2(-28f, -28f);
+                closeRect.sizeDelta = new Vector2(64f, 64f);
+            }
+            Image closeImage = closeDossierBtn.GetComponent<Image>();
+            if (closeImage != null) closeImage.color = new Color(0.86f, 0.16f, 0.20f, 1f);
+            TMP_Text closeText = closeDossierBtn.GetComponentInChildren<TMP_Text>(true);
+            if (closeText != null)
+            {
+                closeText.text = "×";
+                closeText.fontSize = 32f;
+                closeText.alignment = TextAlignmentOptions.Center;
+                closeText.color = Color.white;
             }
         }
 
@@ -617,6 +832,12 @@ public class CaseDossierManager : MonoBehaviour
 
     public void OpenDossier()
     {
+        // Resolve again on every open because Case 1 and Case 2 can have
+        // different canvases while persistent managers survive scene changes.
+        ResolveDossierUIReferences();
+        if (dossierPanel == null)
+            dossierPanel = FindUIObject("DossierPanel");
+
         SetMobileControls(false);
 
         // إغلاق الحقيبة إن كانت مفتوحة لمنع تداخل اللوحات
@@ -652,6 +873,7 @@ public class CaseDossierManager : MonoBehaviour
 
     public void ToggleDossier()
     {
+        ResolveDossierUIReferences();
         if (dossierPanel != null)
         {
             if (dossierPanel.activeSelf) CloseDossier();

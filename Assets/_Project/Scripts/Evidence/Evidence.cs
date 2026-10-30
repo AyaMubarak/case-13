@@ -59,7 +59,7 @@ public class Evidence : MonoBehaviour, IInteractable
     {
         if (requiredRole == DetectiveRole.Any) return true;
 
-        var profile = PlayerProfile.LocalInstance;
+        PlayerProfile profile = PlayerProfile.LocalInstance;
         if (profile == null) return false;
 
         return profile.CurrentRole == requiredRole;

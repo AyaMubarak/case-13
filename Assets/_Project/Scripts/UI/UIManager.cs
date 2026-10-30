@@ -123,8 +123,12 @@ public class UIManager : MonoBehaviour
 
     private void Start()
     {
+        ResolveCaseHudReferences();
+        BindProceedToCase2Buttons();
         HideInteractionPrompt();
         UpdateEvidenceCount(0, 5);
+        if (evidenceCounterText != null && evidenceCounterText.transform.parent != null)
+            evidenceCounterText.transform.parent.gameObject.SetActive(true);
 
         if (inventoryPanel != null) inventoryPanel.SetActive(false);
         if (interrogationBoardPanel != null) interrogationBoardPanel.SetActive(false);
@@ -132,11 +136,6 @@ public class UIManager : MonoBehaviour
         if (notificationBannerText != null && notificationBannerText.transform.parent != null)
         {
             notificationBannerText.transform.parent.gameObject.SetActive(false);
-        }
-
-        if (evidenceCounterText != null && evidenceCounterText.transform.parent != null)
-        {
-            evidenceCounterText.transform.parent.gameObject.SetActive(false);
         }
 
         gameStartTime = Time.time;
@@ -186,14 +185,18 @@ public class UIManager : MonoBehaviour
         if (mobileInventoryBtn == null)
         {
             var foundInv = GameObject.Find("MobileInventoryBtn");
+            if (foundInv == null) foundInv = FindObjectByNames("MobileInventoryBtn", "Btn_Inventory_Mobile", "InventoryButton");
             if (foundInv != null) mobileInventoryBtn = foundInv;
         }
 
         if (mobileDossierBtn == null)
         {
             var foundDos = GameObject.Find("Btn_Dossier_Mobile");
+            if (foundDos == null) foundDos = FindObjectByNames("Btn_Dossier_Mobile", "MobileDossierBtn", "SuspectsButton");
             if (foundDos != null) mobileDossierBtn = foundDos;
         }
+
+        BindDossierButtonSafely();
 
         // تفريغ مساحة علوية لمنع TouchLookArea من حجب أزرار الواجهة في أعلى الشاشة
         GameObject touchLookObj = GameObject.Find("TouchLookArea");
@@ -293,13 +296,71 @@ public class UIManager : MonoBehaviour
                 dossierBtnComp.onClick.AddListener(OnMobileDossierButtonClicked);
             }
 
-            var trigger = mobileDossierBtn.GetComponent<UnityEngine.EventSystems.EventTrigger>();
-            if (trigger == null) trigger = mobileDossierBtn.AddComponent<UnityEngine.EventSystems.EventTrigger>();
-            trigger.triggers.Clear();
-            var entry = new UnityEngine.EventSystems.EventTrigger.Entry();
-            entry.eventID = UnityEngine.EventSystems.EventTriggerType.PointerClick;
-            entry.callback.AddListener((data) => { OnMobileDossierButtonClicked(); });
-            trigger.triggers.Add(entry);
+        }
+    }
+
+    private void ResolveCaseHudReferences()
+    {
+        if (mobileControls == null) mobileControls = FindObjectByNames("MobileControls");
+        if (mobileInventoryBtn == null) mobileInventoryBtn = FindObjectByNames("MobileInventoryBtn", "Btn_Inventory_Mobile", "InventoryButton");
+        if (mobileDossierBtn == null) mobileDossierBtn = FindObjectByNames("Btn_Dossier_Mobile", "MobileDossierBtn", "SuspectsButton");
+        if (evidenceCounterText == null)
+            evidenceCounterText = FindTextByNames("EvidenceCounterText", "EvidenceCountText", "EvidenceCounter");
+        if (notificationBannerText == null)
+            notificationBannerText = FindTextByNames("NotificationBannerText", "NotificationText", "AlertText");
+        if (interactionPromptText == null)
+            interactionPromptText = FindTextByNames("InteractionPromptText", "InteractionPrompt", "InteractPrompt");
+        if (inGameHUD == null)
+        {
+            GameObject found = FindObjectByNames("InGameHUD", "HUD", "UI_Container");
+            if (found != null) inGameHUD = found;
+        }
+    }
+
+    private static TextMeshProUGUI FindTextByNames(params string[] names)
+    {
+        foreach (TextMeshProUGUI text in FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include))
+            foreach (string name in names)
+                if (text.name == name) return text;
+        return null;
+    }
+
+    private static GameObject FindObjectByNames(params string[] names)
+    {
+        foreach (Transform t in FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            foreach (string name in names)
+                if (t.name == name) return t.gameObject;
+        return null;
+    }
+
+    private void BindProceedToCase2Buttons()
+    {
+        if (!UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case01")) return;
+
+        foreach (Button button in FindObjectsByType<Button>(FindObjectsInactive.Include))
+        {
+            bool isProceed = button.name.IndexOf("proceed", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             button.name.IndexOf("case2", System.StringComparison.OrdinalIgnoreCase) >= 0;
+
+            if (!isProceed)
+            {
+                foreach (TMP_Text label in button.GetComponentsInChildren<TMP_Text>(true))
+                {
+                    string text = label.text ?? string.Empty;
+                    if (text.IndexOf("PROCEED", System.StringComparison.OrdinalIgnoreCase) >= 0 &&
+                        text.IndexOf("CASE 02", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        isProceed = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!isProceed) continue;
+
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(ProceedToNextCase);
+            Debug.Log("[UI] Proceed to Case 2 button bound: " + button.name);
         }
     }
 
@@ -379,7 +440,33 @@ public class UIManager : MonoBehaviour
     public void OnMobileDossierButtonClicked()
     {
         Debug.Log("<color=cyan>[UI] Dossier Button Clicked via Mobile UI!</color>");
+        if (CaseDossierManager.Instance == null)
+        {
+            CaseDossierManager found = FindAnyObjectByType<CaseDossierManager>(FindObjectsInactive.Include);
+            if (found != null)
+            {
+                found.ToggleDossier();
+                return;
+            }
+        }
         ToggleInterrogationDossier();
+    }
+
+    private void BindDossierButtonSafely()
+    {
+        if (mobileDossierBtn == null) return;
+
+        mobileDossierBtn.SetActive(true);
+        Button button = mobileDossierBtn.GetComponent<Button>();
+        if (button == null) button = mobileDossierBtn.AddComponent<Button>();
+        button.onClick.RemoveAllListeners();
+        button.onClick.AddListener(OnMobileDossierButtonClicked);
+
+        var trigger = mobileDossierBtn.GetComponent<UnityEngine.EventSystems.EventTrigger>();
+        if (trigger == null) trigger = mobileDossierBtn.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+        // The Button listener above is the single click path. Keeping an
+        // additional PointerClick callback would toggle the dossier twice.
+        trigger.triggers.Clear();
     }
 
     public void ToggleInventory()
@@ -597,13 +684,17 @@ public class UIManager : MonoBehaviour
         RectTransform panelRect = inventoryPanel.GetComponent<RectTransform>();
         if (panelRect != null)
         {
+            Canvas canvas = inventoryPanel.GetComponentInParent<Canvas>(true);
+            if (canvas != null && inventoryPanel.transform.parent != canvas.transform)
+                inventoryPanel.transform.SetParent(canvas.transform, false);
             panelRect.localScale = Vector3.one;
-            panelRect.anchorMin = new Vector2(0.04f, 0.05f);
-            panelRect.anchorMax = new Vector2(0.96f, 0.95f);
+            panelRect.anchorMin = Vector2.zero;
+            panelRect.anchorMax = Vector2.one;
             panelRect.offsetMin = Vector2.zero;
             panelRect.offsetMax = Vector2.zero;
             panelRect.anchoredPosition = Vector2.zero;
             panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.sizeDelta = Vector2.zero;
         }
 
         // 2. خلفية الحقيبة الأساسية بلون داكن فخم مع لمعة كحلية
@@ -1207,18 +1298,24 @@ public class UIManager : MonoBehaviour
     {
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
-        string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-        if (currentScene == "Case01_Main")
+
+        const string nextScene = "Case02_Main";
+        PlayerPrefs.SetString("Selected_Case", nextScene);
+        PlayerPrefs.Save();
+
+        // In a real multiplayer match the MasterClient must load the scene
+        // through Photon so every player enters Case 2 together with the role
+        // they selected in the lobby. Local testing uses SceneManager.
+        if (Photon.Pun.PhotonNetwork.InRoom)
         {
-            PlayerPrefs.SetString("Selected_Case", "Case02_Main");
-            PlayerPrefs.Save();
-            UnityEngine.SceneManagement.SceneManager.LoadScene("Case02_Main");
+            if (Photon.Pun.PhotonNetwork.IsMasterClient)
+                Photon.Pun.PhotonNetwork.LoadLevel(nextScene);
+            else
+                Debug.Log("[CASE TRANSITION] Waiting for MasterClient to load Case02_Main.");
         }
         else
         {
-            PlayerPrefs.SetString("Selected_Case", "Case02_Main");
-            PlayerPrefs.Save();
-            UnityEngine.SceneManagement.SceneManager.LoadScene("Case02_Main");
+            UnityEngine.SceneManagement.SceneManager.LoadScene(nextScene);
         }
     }
 

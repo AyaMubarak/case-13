@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!1 &1557515130757202520
 GameObject:
@@ -101,8 +101,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   moveSpeed: 4
   rotationSpeed: 10
-  inputSensitivity: 0.85
+  collisionSkin: 0.03
+  collisionLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
   mobileJoystick: {fileID: 0}
+  forceSimpleMove: 1
+  snapToGround: 1
+  groundCheckDistance: 1.5
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!114 &1960080071880642252
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -139,6 +148,7 @@ MonoBehaviour:
   agentCodename: Vanguard-1
   gender: 1
   currentRole: 2
+  useLocalTestOverride: 0
 --- !u!1 &6529861722226290130
 GameObject:
   m_ObjectHideFlags: 0

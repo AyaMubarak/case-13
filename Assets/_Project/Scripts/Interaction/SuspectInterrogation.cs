@@ -33,15 +33,12 @@ public class SuspectInterrogation : MonoBehaviour, IInteractable
 
     public void Interact()
     {
-        // فحص صلاحية الدور
         if (PlayerProfile.LocalPlayer != null &&
             PlayerProfile.LocalPlayer.currentRole != DetectiveRole.Interrogator &&
             PlayerProfile.LocalPlayer.currentRole != DetectiveRole.Any)
         {
             if (UIManager.Instance != null)
-            {
                 UIManager.Instance.ShowOnScreenNotification("ACCESS DENIED // REQUIRES INTERROGATOR");
-            }
             return;
         }
 

@@ -37,6 +37,10 @@ public class EvidenceCutsceneManager : MonoBehaviour
             return;
         }
 
+        // Case 2 may contain the manager but have empty serialized references.
+        // Resolve the existing UI by name, including inactive objects.
+        ResolveRuntimeReferences();
+
         // إخفاء اللوحات عند بدء التشغيل
         if (videoPanel != null) videoPanel.SetActive(false);
         if (quizPopupPanel != null) quizPopupPanel.SetActive(false);
@@ -76,11 +80,101 @@ public class EvidenceCutsceneManager : MonoBehaviour
         }
     }
 
+    private void ResolveRuntimeReferences()
+    {
+        if (videoPanel == null) videoPanel = FindObjectByNames("VideoPanel", "EvidenceVideoPanel", "EvidenceVideo");
+        if (quizPopupPanel == null) quizPopupPanel = FindObjectByNames("QuizPopupPanel", "EvidenceQuizPanel", "QuestionPanel");
+        if (mobileControls == null) mobileControls = FindObjectByNames("MobileControls");
+
+        if (videoPlayer == null && videoPanel != null)
+            videoPlayer = videoPanel.GetComponentInChildren<VideoPlayer>(true);
+        if (videoScreen == null && videoPanel != null)
+            videoScreen = videoPanel.GetComponentInChildren<RawImage>(true);
+        if (skipVideoBtn == null && videoPanel != null)
+            skipVideoBtn = FindButtonInTree(videoPanel.transform, "skip");
+
+        if (questionText == null && quizPopupPanel != null)
+        {
+            questionText = FindTextInTree(quizPopupPanel.transform, "Txt_Question", "QuestionText", "Question");
+            if (questionText == null) questionText = quizPopupPanel.GetComponentInChildren<TMP_Text>(true);
+        }
+
+        if (optionButtons == null || optionButtons.Length == 0 || !HasButton(optionButtons))
+        {
+            Button[] found = FindOptionButtons(quizPopupPanel != null ? quizPopupPanel.transform : null);
+            if (found.Length > 0) optionButtons = found;
+        }
+
+        if (optionButtonTexts == null || optionButtonTexts.Length == 0 || !HasText(optionButtonTexts))
+        {
+            if (optionButtons != null)
+            {
+                optionButtonTexts = new TMP_Text[optionButtons.Length];
+                for (int i = 0; i < optionButtons.Length; i++)
+                    if (optionButtons[i] != null)
+                        optionButtonTexts[i] = optionButtons[i].GetComponentInChildren<TMP_Text>(true);
+            }
+        }
+
+        Debug.Log($"[EvidenceFlow] UI resolved. VideoPanel={videoPanel != null}, VideoPlayer={videoPlayer != null}, Quiz={quizPopupPanel != null}, Options={optionButtons?.Length ?? 0}");
+    }
+
+    private static GameObject FindObjectByNames(params string[] names)
+    {
+        foreach (Transform t in FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            foreach (string name in names)
+                if (t.name == name) return t.gameObject;
+        return null;
+    }
+
+    private static Button FindButtonInTree(Transform root, string contains)
+    {
+        if (root == null) return null;
+        foreach (Button b in root.GetComponentsInChildren<Button>(true))
+            if (b.name.ToLowerInvariant().Contains(contains)) return b;
+        return null;
+    }
+
+    private static TMP_Text FindTextInTree(Transform root, params string[] names)
+    {
+        if (root == null) return null;
+        foreach (TMP_Text text in root.GetComponentsInChildren<TMP_Text>(true))
+            foreach (string name in names)
+                if (text.name == name) return text;
+        return null;
+    }
+
+    private static Button[] FindOptionButtons(Transform root)
+    {
+        if (root == null) return new Button[0];
+        var result = new System.Collections.Generic.List<Button>();
+        foreach (Button b in root.GetComponentsInChildren<Button>(true))
+            if (b.name.ToLowerInvariant().Contains("option")) result.Add(b);
+        result.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+        return result.ToArray();
+    }
+
+    private static bool HasButton(Button[] buttons)
+    {
+        if (buttons == null || buttons.Length == 0) return false;
+        foreach (Button b in buttons) if (b != null) return true;
+        return false;
+    }
+
+    private static bool HasText(TMP_Text[] texts)
+    {
+        if (texts == null || texts.Length == 0) return false;
+        foreach (TMP_Text t in texts) if (t != null) return true;
+        return false;
+    }
+
     public static bool IsQuizOrVideoActive { get; private set; } = false;
 
     // تُستدعى عندما يضغط اللاعب على الدليل في الغرفة
     public void PlayEvidenceFlow(Evidence evidence)
     {
+        if (evidence == null) return;
+        ResolveRuntimeReferences();
         activeEvidence = evidence;
         IsQuizOrVideoActive = true;
         isAnsweringQuiz = false;
@@ -120,10 +214,17 @@ public class EvidenceCutsceneManager : MonoBehaviour
             videoPlayer.prepareCompleted += OnVideoPrepared;
             videoPlayer.Prepare();
         }
-        else
+        else if (quizPopupPanel != null)
         {
             // لو لم يكن هناك فيديو، انتقل للأسئلة مباشرة
             ShowQuizPopup();
+        }
+        else
+        {
+            // لا نترك الدليل عالقاً إذا كان المشهد ناقصاً.
+            Debug.LogWarning("[EvidenceFlow] Video/quiz UI is missing; collecting evidence directly.");
+            IsQuizOrVideoActive = false;
+            evidence.CollectDirectly();
         }
     }
 

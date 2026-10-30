@@ -4,8 +4,12 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
+using UnityEngine.SceneManagement;
+using UnityEngine.Video;
+using UnityEngine.UI;
 
 public class Case2LabSetup : EditorWindow
 {
@@ -62,6 +66,8 @@ public class Case2LabSetup : EditorWindow
             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
             currentScene = EditorSceneManager.OpenScene(targetScenePath);
         }
+
+        CopyCase1GameplayRoots(currentScene);
 
         Undo.IncrementCurrentGroup();
         int undoGroup = Undo.GetCurrentGroup();
@@ -219,7 +225,7 @@ public class Case2LabSetup : EditorWindow
         GameObject tableMetalPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ScifiOfficeLite/Prefabs/Tables/Metal/Table Metal Variant.prefab");
         GameObject tableWoodPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ScifiOfficeLite/Prefabs/Tables/Grey Wood/Table Grey Wood Variant.prefab");
         GameObject shelfCratesPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ScifiOfficeLite/Prefabs/Shelf with Crates.prefab");
-        GameObject chairPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ScifiOfficeLite/Prefabs/Chairs and Stools/Office Chair.prefab");
+        GameObject chairPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ScifiOfficeLite/Prefabs/Chairs and Stools/Office Chair Variant.prefab");
         GameObject stoolPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ScifiOfficeLite/Prefabs/Chairs and Stools/Stool.prefab");
 
         // Extra Server Racks in Server Room (around Z=43, X=-6 to -8)
@@ -281,8 +287,7 @@ public class Case2LabSetup : EditorWindow
             {
                 interrogationChair = (GameObject)PrefabUtility.InstantiatePrefab(chairPrefab, propsContainer);
                 interrogationChair.name = "Interrogation_Lab_Chair";
-                interrogationChair.transform.localPosition = new Vector3(4.2f, 0.0f, 33.25f);
-                interrogationChair.transform.localRotation = Quaternion.identity;
+            // Case 2 chair transform is designer-authored. Do not overwrite it.
 
                 GameObject investigatorChair = (GameObject)PrefabUtility.InstantiatePrefab(chairPrefab, propsContainer);
                 investigatorChair.name = "Investigator_Desk_Chair";
@@ -301,13 +306,11 @@ public class Case2LabSetup : EditorWindow
 
         if (interrogationChair != null)
         {
-            chairTargetGO.transform.position = new Vector3(4.2f, 0.0f, 33.25f);
-            chairTargetGO.transform.rotation = Quaternion.Euler(0, 0, 0); // Humanoid faces North (+Z towards desk)
+            // Keep the designer-authored ChairTarget transform unchanged.
         }
         else
         {
-            chairTargetGO.transform.position = new Vector3(4.2f, 0.0f, 33.25f);
-            chairTargetGO.transform.rotation = Quaternion.Euler(0, 0, 0);
+            // Keep the designer-authored ChairTarget transform unchanged.
         }
 
         var sim = Object.FindAnyObjectByType<SeparateInterrogationManager>(FindObjectsInactive.Include);
@@ -336,11 +339,51 @@ public class Case2LabSetup : EditorWindow
 
         // 11. POSITION THE PLAYER SECURELY ON THE ROOM FLOOR (Floor is at Y=0.0)
         var playerMovement = Object.FindAnyObjectByType<PlayerMovement>(FindObjectsInactive.Include);
+        if (playerMovement == null)
+        {
+            string playerPrefabPath = "Assets/_Project/Prefabs/Player.prefab";
+            GameObject playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(playerPrefabPath);
+            if (playerPrefab != null)
+            {
+                GameObject playerObject = (GameObject)PrefabUtility.InstantiatePrefab(playerPrefab);
+                playerObject.name = "Player";
+                playerObject.transform.position = new Vector3(4.285f, 0.05f, 31.0f);
+                playerObject.transform.rotation = Quaternion.identity;
+                Undo.RegisterCreatedObjectUndo(playerObject, "Add Case 2 Player");
+                playerMovement = playerObject.GetComponent<PlayerMovement>();
+                Debug.Log("<color=green>[LabSetup] Missing Player was added from Player.prefab.</color>");
+            }
+            else
+            {
+                Debug.LogError("[LabSetup] Player.prefab not found at " + playerPrefabPath);
+            }
+        }
         if (playerMovement != null)
         {
             playerMovement.transform.position = new Vector3(4.285f, 0.05f, 31.0f);
             playerMovement.transform.rotation = Quaternion.Euler(0, 0, 0);
             Debug.Log($"<color=green>[LabSetup] Player placed securely on room floor at (4.285, 0.05, 31.0)!</color>");
+        }
+
+        // Ensure the five evidence prefabs are present even when the source
+        // scene was empty or had lost its evidence objects.
+        Vector3[] evidencePositions =
+        {
+            new Vector3(7.35f, 0.78f, 34.8f),
+            new Vector3(2.15f, 0.78f, 48.2f),
+            new Vector3(-2.8f, 0.78f, 40.5f),
+            new Vector3(1.05f, 0.78f, 35.5f),
+            new Vector3(-2.8f, 0.78f, 37.6f)
+        };
+        for (int i = 1; i <= 5; i++)
+        {
+            if (Object.FindObjectsByType<Evidence>(FindObjectsInactive.Include).Any(e => e != null && e.name == $"EV_0{i}")) continue;
+            GameObject evidencePrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Project/Prefabs/Evidence_{i}.prefab");
+            if (evidencePrefab == null) continue;
+            GameObject evidenceObject = (GameObject)PrefabUtility.InstantiatePrefab(evidencePrefab);
+            evidenceObject.name = $"EV_0{i}";
+            evidenceObject.transform.position = evidencePositions[i - 1];
+            Undo.RegisterCreatedObjectUndo(evidenceObject, "Add Case 2 Evidence");
         }
 
         // Suspects (Victor Sterling & Elena Rostova) firmly on the floor at Y=0.0
@@ -384,16 +427,29 @@ public class Case2LabSetup : EditorWindow
 
         // 13. Ensure Main Camera settings
         Camera mainCam = Camera.main;
+        if (mainCam == null)
+        {
+            GameObject cameraObject = new GameObject("Main Camera");
+            cameraObject.tag = "MainCamera";
+            mainCam = cameraObject.AddComponent<Camera>();
+            cameraObject.AddComponent<AudioListener>();
+            Undo.RegisterCreatedObjectUndo(cameraObject, "Add Case 2 Main Camera");
+        }
         if (mainCam != null)
         {
             mainCam.nearClipPlane = 0.05f;
             mainCam.farClipPlane = 200f;
             // Set Skybox or ambient clear flag
             mainCam.clearFlags = CameraClearFlags.Skybox;
+            CameraFollow cameraFollow = mainCam.GetComponent<CameraFollow>();
+            if (cameraFollow == null) cameraFollow = mainCam.gameObject.AddComponent<CameraFollow>();
+            if (playerMovement != null) cameraFollow.target = playerMovement.transform;
         }
 
         // 14. Assign Voices
         AssignCase2Voices();
+
+        EnsureCase2IntroCutscene();
 
         // 15. Fix Evidence Materials to URP
         EvidenceMaterialDiagnostics.FixEvidenceMaterials();
@@ -415,6 +471,168 @@ public class Case2LabSetup : EditorWindow
             "✓ Evidence items placed on lab workbenches\n" +
             "✓ Victor and Elena voices connected\n\n" +
             "Press Play to test your new laboratory!", "OK");
+    }
+
+    private static void EnsureCase2IntroCutscene()
+    {
+        if (Object.FindAnyObjectByType<CaseIntroCutscene>(FindObjectsInactive.Include) != null) return;
+
+        VideoClip introClip = AssetDatabase.LoadAssetAtPath<VideoClip>("Assets/_Project/Prefabs/gemini_generated_video_e41c4fb5.mp4");
+        if (introClip == null)
+        {
+            Debug.LogWarning("[LabSetup] Case 2 intro video not found: gemini_generated_video_e41c4fb5.mp4");
+            return;
+        }
+
+        GameObject canvasGO = new GameObject("Case2_IntroCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        Canvas canvas = canvasGO.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 500;
+        CanvasScaler scaler = canvasGO.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+
+        GameObject panel = new GameObject("Case2_IntroPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        panel.transform.SetParent(canvasGO.transform, false);
+        RectTransform panelRect = panel.GetComponent<RectTransform>();
+        panelRect.anchorMin = Vector2.zero; panelRect.anchorMax = Vector2.one;
+        panelRect.offsetMin = Vector2.zero; panelRect.offsetMax = Vector2.zero;
+        panel.GetComponent<Image>().color = Color.black;
+
+        GameObject screen = new GameObject("Case2_IntroVideo", typeof(RectTransform), typeof(CanvasRenderer), typeof(RawImage));
+        screen.transform.SetParent(panel.transform, false);
+        RectTransform screenRect = screen.GetComponent<RectTransform>();
+        screenRect.anchorMin = Vector2.zero; screenRect.anchorMax = Vector2.one;
+        screenRect.offsetMin = Vector2.zero; screenRect.offsetMax = Vector2.zero;
+        AspectRatioFitter aspect = screen.AddComponent<AspectRatioFitter>();
+        aspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+        aspect.aspectRatio = 16f / 9f;
+
+        RenderTexture texture = new RenderTexture(1920, 1080, 0);
+        texture.name = "Case2_IntroVideoTexture";
+        screen.GetComponent<RawImage>().texture = texture;
+
+        GameObject playerGO = new GameObject("Case2_IntroVideoPlayer", typeof(VideoPlayer));
+        playerGO.transform.SetParent(canvasGO.transform, false);
+        VideoPlayer videoPlayer = playerGO.GetComponent<VideoPlayer>();
+        videoPlayer.playOnAwake = false;
+        videoPlayer.isLooping = false;
+        videoPlayer.renderMode = VideoRenderMode.RenderTexture;
+        videoPlayer.targetTexture = texture;
+        videoPlayer.clip = introClip;
+
+        GameObject skipGO = new GameObject("SkipIntroButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        skipGO.transform.SetParent(panel.transform, false);
+        RectTransform skipRect = skipGO.GetComponent<RectTransform>();
+        skipRect.anchorMin = new Vector2(1f, 1f); skipRect.anchorMax = new Vector2(1f, 1f);
+        skipRect.pivot = new Vector2(1f, 1f); skipRect.anchoredPosition = new Vector2(-30f, -30f);
+        skipRect.sizeDelta = new Vector2(180f, 60f);
+        skipGO.GetComponent<Image>().color = new Color(0.05f, 0.7f, 0.9f, 0.9f);
+        GameObject skipTextGO = new GameObject("SkipText", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+        skipTextGO.transform.SetParent(skipGO.transform, false);
+        RectTransform skipTextRect = skipTextGO.GetComponent<RectTransform>();
+        skipTextRect.anchorMin = Vector2.zero; skipTextRect.anchorMax = Vector2.one;
+        skipTextRect.offsetMin = Vector2.zero; skipTextRect.offsetMax = Vector2.zero;
+        Text skipText = skipTextGO.GetComponent<Text>();
+        skipText.text = "SKIP";
+        skipText.alignment = TextAnchor.MiddleCenter;
+        skipText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        skipText.fontSize = 24;
+        skipText.fontStyle = FontStyle.Bold;
+        skipText.color = Color.white;
+
+        GameObject introGO = new GameObject("Case2_IntroCutscene", typeof(CaseIntroCutscene));
+        CaseIntroCutscene intro = introGO.GetComponent<CaseIntroCutscene>();
+        SerializedObject so = new SerializedObject(intro);
+        so.FindProperty("videoPlayer").objectReferenceValue = videoPlayer;
+        so.FindProperty("videoDisplay").objectReferenceValue = screen.GetComponent<RawImage>();
+        so.FindProperty("cutsceneUIPanel").objectReferenceValue = panel;
+        so.FindProperty("skipButton").objectReferenceValue = skipGO.GetComponent<Button>();
+        so.ApplyModifiedPropertiesWithoutUndo();
+        Undo.RegisterCreatedObjectUndo(canvasGO, "Create Case 2 intro video UI");
+        Undo.RegisterCreatedObjectUndo(playerGO, "Create Case 2 intro video player");
+        Undo.RegisterCreatedObjectUndo(introGO, "Create Case 2 intro cutscene");
+        Debug.Log("[LabSetup] Case 2 intro connected to gemini_generated_video_e41c4fb5.");
+    }
+
+    private static void CopyCase1GameplayRoots(Scene targetScene)
+    {
+        string case1Path = "Assets/_Project/Scenes/Case01_Main.unity";
+        if (EditorSceneManager.GetSceneByPath(case1Path).isLoaded) return;
+
+        Scene sourceScene = EditorSceneManager.OpenScene(case1Path, OpenSceneMode.Additive);
+        // Case 1's visible Canvas is nested under the root named "UI".
+        // Copy these roots by their exact names so the serialized references
+        // for alerts, dossier, suspects, evidence counter and mobile controls
+        // stay together.
+        string[] exactRoots = { "UI", "Managers", "MobileControls", "EventSystem" };
+        string[] tokens = { "Canvas", "Mobile", "Joystick", "Evidence", "Video", "Dossier", "UI", "EventSystem", "Camera", "Cutscene", "Briefing", "GameUI", "Panels", "Manager", "Intro", "Role", "Hud" };
+
+        // Remove duplicate controls/UI roots left by earlier setup attempts.
+        foreach (GameObject root in targetScene.GetRootGameObjects())
+        {
+            if (exactRoots.Any(n => root.name == n) || root.name.IndexOf("MobileControls", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                Object.DestroyImmediate(root);
+        }
+        foreach (GameObject root in sourceScene.GetRootGameObjects())
+        {
+            bool relevant = exactRoots.Contains(root.name) || tokens.Any(t => root.name.IndexOf(t, System.StringComparison.OrdinalIgnoreCase) >= 0);
+            // GameObject.Find also searches the additive Case 1 scene. Using it
+            // here made every root look like it already existed and prevented
+            // the Canvas/EventSystem from being copied at all.
+            bool alreadyInTarget = targetScene.GetRootGameObjects()
+                .Any(targetRoot => targetRoot != null && targetRoot.name == root.name);
+            if (!relevant || alreadyInTarget) continue;
+
+            GameObject clone = Object.Instantiate(root);
+            clone.name = root.name;
+            SceneManager.MoveGameObjectToScene(clone, targetScene);
+            Undo.RegisterCreatedObjectUndo(clone, "Copy Case 1 gameplay root to Case 2");
+        }
+
+        EditorSceneManager.CloseScene(sourceScene, false);
+        Debug.Log("[LabSetup] Copied Case 1 gameplay roots: camera, mobile controls, panels and evidence UI.");
+    }
+
+    [MenuItem("Case 2 Setup/Copy Case 1 UI Exactly to Case 2")]
+    public static void CopyCase1UIExactlyToCase2()
+    {
+        Scene target = EditorSceneManager.GetActiveScene();
+        if (target.name != "Case02_Main")
+            target = EditorSceneManager.OpenScene("Assets/_Project/Scenes/Case02_Main.unity");
+
+        CopyCase1GameplayRoots(target);
+        EditorSceneManager.MarkSceneDirty(target);
+        EditorSceneManager.SaveScene(target);
+        Debug.Log("[LabSetup] Exact Case 1 UI copied to Case02_Main and saved.");
+    }
+
+    [MenuItem("Case 2 Setup/Clean Missing Scripts from Case 2")]
+    public static void CleanMissingScriptsFromCase2()
+    {
+        Scene scene = EditorSceneManager.GetActiveScene();
+        if (scene.name != "Case02_Main")
+        {
+            scene = EditorSceneManager.OpenScene("Assets/_Project/Scenes/Case02_Main.unity");
+        }
+
+        int removed = 0;
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            {
+                int before = child.gameObject.GetComponents<Component>().Length;
+                GameObjectUtility.RemoveMonoBehavioursWithMissingScript(child.gameObject);
+                int after = child.gameObject.GetComponents<Component>().Length;
+                removed += Mathf.Max(0, before - after);
+            }
+        }
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log($"[Case2 Cleanup] Removed {removed} missing script component(s) from Case02_Main.");
     }
 
     [MenuItem("Cases/Upgrade ScifiOffice Materials to URP")]
@@ -584,9 +802,8 @@ public class Case2LabSetup : EditorWindow
         Vector3 chairPos = new Vector3(4.2f, 0.0f, 33.25f);
         if (chairObj != null)
         {
-            chairObj.transform.position = chairPos;
-            chairObj.transform.rotation = Quaternion.identity;
-            EditorUtility.SetDirty(chairObj);
+            // Case 2 chair is positioned and rotated manually in the scene.
+            // Never change its Transform from the setup script.
         }
 
         // Ensure ChairTarget exists and is positioned accurately
@@ -595,9 +812,7 @@ public class Case2LabSetup : EditorWindow
         {
             chairTarget = new GameObject("ChairTarget");
         }
-        chairTarget.transform.position = chairPos;
-        chairTarget.transform.rotation = Quaternion.Euler(0, 0, 0); // Suspect faces North (+Z towards desk)
-        EditorUtility.SetDirty(chairTarget);
+        // ChairTarget is also designer-authored. Keep its scene Transform.
 
         // 3. Setup Suspect 1 (Victor Sterling / Evan - Man in Black Walking.fbx)
         GameObject victorGO = GameObject.Find("NPC_Victor");
@@ -1015,6 +1230,7 @@ public class Case2LabSetup : EditorWindow
     [MenuItem("Cases/Assign Case 2 Audio Voices (Victor & Elena)")]
     public static void AssignCase2Voices()
     {
+        if (!EditorSceneManager.GetActiveScene().name.Contains("02")) return;
         AssetDatabase.Refresh();
 
         AudioClip victorClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Project/Audio/Victor .mp3");
@@ -1075,6 +1291,10 @@ public class Case2LabSetup : EditorWindow
 
         GameObject elenaMaleAudioGO = GameObject.Find("nora");
         if (elenaMaleAudioGO != null && elenaMaleClip != null) { AudioSource src = elenaMaleAudioGO.GetComponent<AudioSource>(); if (src != null) { src.clip = elenaMaleClip; EditorUtility.SetDirty(src); } }
+
+        EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+        EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
+        Debug.Log("[Case2 Audio] Victor/Elena suspect voices and detective voices assigned and saved.");
     }
 
     private static void PlaceEvidenceInScene(string evidenceID, Vector3 pos, Quaternion rot, string eliminatesSuspect = null, string finding = null)

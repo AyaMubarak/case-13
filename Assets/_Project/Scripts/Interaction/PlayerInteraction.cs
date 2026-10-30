@@ -6,17 +6,38 @@ public class PlayerInteraction : MonoBehaviour
 {
     [Header("Interaction Settings")]
     [Tooltip("نصف قطر دائرة التفاعل حول اللاعب")]
-    public float interactionRadius = 2.2f;
+    public float interactionRadius = 1.35f;
 
     [Header("Mobile Controls UI")]
     public GameObject mobileInteractBtn;
+
+    [Header("Camera Targeting")]
+    [Tooltip("يفحص الدليل الموجود أمام الكاميرا حتى لو كان الـ pivot بعيداً عن جسم الدليل")]
+    public float cameraInteractionDistance = 1.55f;
 
     private IInteractable currentInteractable;
 
     private void Start()
     {
-        // مسافة تفاعل مريحة (2.2m) تمكن اللاعب من التفاعل مع الأدلة الموضوعة على المكاتب والطاولات
-        interactionRadius = 2.2f;
+        // Keep the hand prompt local to the evidence. This applies to both
+        // Case 1 and Case 2 and prevents collecting from across the room.
+        interactionRadius = Mathf.Clamp(interactionRadius, 1.1f, 1.5f);
+        cameraInteractionDistance = Mathf.Clamp(cameraInteractionDistance, 1.25f, 1.7f);
+
+        // Find the hand button automatically. The button may be inactive in the
+        // authored mobile canvas, so GameObject.Find is not sufficient.
+        if (mobileInteractBtn == null)
+        {
+            foreach (Button candidate in Object.FindObjectsByType<Button>(FindObjectsInactive.Include))
+            {
+                string n = candidate.name.ToLowerInvariant();
+                if (n.Contains("interact") || n.Contains("hand") || n.Contains("collect") || n.Contains("investigate"))
+                {
+                    mobileInteractBtn = candidate.gameObject;
+                    break;
+                }
+            }
+        }
 
         if (mobileInteractBtn != null)
         {
@@ -38,6 +59,17 @@ public class PlayerInteraction : MonoBehaviour
             return;
         }
 
+        // Prefer the object directly in front of the player's view. This fixes
+        // evidence whose visual mesh/pivot is not centered on its root.
+        IInteractable aimedInteractable = FindAimedInteractable();
+        if (aimedInteractable != null)
+        {
+            SetCurrentInteraction(aimedInteractable);
+            if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
+                ExecuteInteraction();
+            return;
+        }
+
         // مركز فحص التفاعل يكون عند مستوى صدر/وسط اللاعب لضمان التقاط الأدلة الموضوعة على الطاولات والأرض
         Vector3 playerCenter = transform.position + Vector3.up * 0.9f;
 
@@ -48,6 +80,9 @@ public class PlayerInteraction : MonoBehaviour
 
         foreach (var hitCollider in hitColliders)
         {
+            MeshCollider meshCollider = hitCollider as MeshCollider;
+            if (meshCollider != null && !meshCollider.convex)
+                continue;
             // تجاهل كوليدرات اللاعب نفسه
             if (hitCollider.gameObject == gameObject || hitCollider.transform.root == transform.root)
                 continue;
@@ -74,17 +109,7 @@ public class PlayerInteraction : MonoBehaviour
 
         if (closestInteractable != null)
         {
-            currentInteractable = closestInteractable;
-
-            if (UIManager.Instance != null)
-            {
-                UIManager.Instance.ShowInteractionPrompt(currentInteractable.InteractionPrompt);
-            }
-
-            if (mobileInteractBtn != null && !mobileInteractBtn.activeSelf)
-            {
-                mobileInteractBtn.SetActive(true);
-            }
+            SetCurrentInteraction(closestInteractable);
 
             // التفاعل عند ضغط E على الكيبورد
             if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
@@ -96,6 +121,32 @@ public class PlayerInteraction : MonoBehaviour
         {
             ClearCurrentInteraction();
         }
+    }
+
+    private IInteractable FindAimedInteractable()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return null;
+
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        RaycastHit[] hits = Physics.RaycastAll(ray, cameraInteractionDistance, ~0, QueryTriggerInteraction.Collide);
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+        foreach (RaycastHit hit in hits)
+        {
+            if (hit.transform.root == transform.root) continue;
+            IInteractable interactable = hit.collider.GetComponentInParent<IInteractable>();
+            if (interactable != null) return interactable;
+        }
+        return null;
+    }
+
+    private void SetCurrentInteraction(IInteractable interactable)
+    {
+        currentInteractable = interactable;
+        if (UIManager.Instance != null)
+            UIManager.Instance.ShowInteractionPrompt(interactable.InteractionPrompt);
+        if (mobileInteractBtn != null && !mobileInteractBtn.activeSelf)
+            mobileInteractBtn.SetActive(true);
     }
 
     public void TriggerMobileInteraction()
