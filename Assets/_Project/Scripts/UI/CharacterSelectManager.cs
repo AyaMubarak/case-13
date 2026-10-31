@@ -181,13 +181,13 @@ public class CharacterSelectManager : MonoBehaviour
         if (highlight != null && target != null)
         {
             highlight.gameObject.SetActive(true);
-            highlight.SetParent(target.parent, false);
-            highlight.anchorMin = target.anchorMin;
-            highlight.anchorMax = target.anchorMax;
-            highlight.pivot = target.pivot;
-            highlight.anchoredPosition = target.anchoredPosition;
-            highlight.sizeDelta = target.sizeDelta;
-            highlight.localRotation = target.localRotation;
+            highlight.SetParent(target, false);
+            highlight.anchorMin = Vector2.zero;
+            highlight.anchorMax = Vector2.one;
+            highlight.pivot = new Vector2(0.5f, 0.5f);
+            highlight.offsetMin = Vector2.zero;
+            highlight.offsetMax = Vector2.zero;
+            highlight.localRotation = Quaternion.identity;
             highlight.localScale = Vector3.one;
             highlight.SetAsLastSibling();
         }
@@ -200,11 +200,11 @@ public class CharacterSelectManager : MonoBehaviour
         RectTransform inputRect = nameInputField.transform as RectTransform;
         if (inputRect == null) return;
 
-        inputRect.anchorMin = new Vector2(0.5f, 0.5f);
-        inputRect.anchorMax = new Vector2(0.5f, 0.5f);
+        inputRect.anchorMin = new Vector2(0.123f, 0.623f);
+        inputRect.anchorMax = new Vector2(0.343f, 0.695f);
         inputRect.pivot = new Vector2(0.5f, 0.5f);
-        inputRect.anchoredPosition = new Vector2(-592f, 172f);
-        inputRect.sizeDelta = new Vector2(460f, 74f);
+        inputRect.offsetMin = Vector2.zero;
+        inputRect.offsetMax = Vector2.zero;
         inputRect.localScale = Vector3.one;
     }
 
