@@ -4,14 +4,8 @@ using UnityEditor;
 using UnityEngine.AI;
 using UnityEditor.SceneManagement;
 
-[InitializeOnLoad]
 public static class DiagnoseSuspects
 {
-    static DiagnoseSuspects()
-    {
-        EditorApplication.delayCall += RunDiagnosis;
-    }
-
     [MenuItem("Case 2 Setup/FIX SUSPECTS: On Floor & Hidden Until All Evidences Collected")]
     public static void FixAllSuspectsNow()
     {

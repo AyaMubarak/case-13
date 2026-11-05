@@ -11,6 +11,9 @@ public class UIManager : MonoBehaviour
     public static UIManager Instance { get; private set; }
     private const string Case2ReadyProperty = "ReadyForCase2";
     private bool case2TransitionStarted;
+    private Button proceedCaseButton;
+    private TextMeshProUGUI proceedCaseButtonLabel;
+    private Image proceedCaseButtonImage;
 
     [Header("HUD Elements")]
     public TextMeshProUGUI interactionPromptText;
@@ -147,6 +150,13 @@ public class UIManager : MonoBehaviour
         }
 
         bool isFirstCase = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case01");
+        if (!isFirstCase && Photon.Pun.PhotonNetwork.InRoom && Photon.Pun.PhotonNetwork.IsMasterClient && Photon.Pun.PhotonNetwork.CurrentRoom != null)
+        {
+            Photon.Pun.PhotonNetwork.CurrentRoom.SetCustomProperties(new ExitGames.Client.Photon.Hashtable
+            {
+                { "ActiveCaseScene", UnityEngine.SceneManagement.SceneManager.GetActiveScene().name }
+            });
+        }
         ScoreManager.EnsureInstance();
         if (isFirstCase)
         {
@@ -386,6 +396,10 @@ public class UIManager : MonoBehaviour
     private void Update()
     {
         CheckCoopCase2Transition();
+        if (endGamePanel != null && endGamePanel.activeSelf)
+        {
+            UpdateProceedButtonForHostState();
+        }
         // إخفاء فوري وتام لأزرار الحقيبة والملفات أثناء تشغيل أي فيديو أو كاتسين سينمائي
         bool isCutsceneOrVideo = CaseIntroCutscene.IsPlaying || EvidenceCutsceneManager.IsQuizOrVideoActive;
         if (isCutsceneOrVideo)
@@ -1098,6 +1112,7 @@ public class UIManager : MonoBehaviour
         {
             endGamePanel.SetActive(true);
             endGamePanel.transform.SetAsLastSibling();
+            UpdateProceedButtonForHostState();
         }
 
         // إظهار الماوس
@@ -1400,10 +1415,12 @@ public class UIManager : MonoBehaviour
 
         Image proceedImg = proceedBtnObj.GetComponent<Image>();
         proceedImg.color = new Color(0.05f, 0.55f, 0.65f, 0.98f); // Cyan Accent
+        proceedCaseButtonImage = proceedImg;
 
         Button proceedBtn = proceedBtnObj.GetComponent<Button>();
         proceedBtn.onClick.RemoveAllListeners();
         proceedBtn.onClick.AddListener(ProceedToNextCase);
+        proceedCaseButton = proceedBtn;
 
         GameObject proceedLabel = new GameObject("ProceedBtnLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
         proceedLabel.transform.SetParent(proceedBtnObj.transform, false);
@@ -1418,6 +1435,54 @@ public class UIManager : MonoBehaviour
         pLabelTmp.alignment = TextAlignmentOptions.Center;
         pLabelTmp.fontSize = 17f;
         pLabelTmp.color = Color.white;
+        proceedCaseButtonLabel = pLabelTmp;
+
+        UpdateProceedButtonForHostState();
+    }
+
+    private void UpdateProceedButtonForHostState()
+    {
+        if (proceedCaseButton == null && endGamePanel != null)
+        {
+            Transform found = endGamePanel.transform.Find("EvaluationCard/ProceedCaseBtn");
+            if (found != null)
+            {
+                proceedCaseButton = found.GetComponent<Button>();
+                proceedCaseButtonImage = found.GetComponent<Image>();
+                proceedCaseButtonLabel = found.GetComponentInChildren<TextMeshProUGUI>(true);
+            }
+        }
+
+        if (proceedCaseButton == null) return;
+
+        bool isCase2 = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02");
+        bool isCoop = Photon.Pun.PhotonNetwork.InRoom;
+        bool canClick = !isCoop || Photon.Pun.PhotonNetwork.IsMasterClient;
+
+        proceedCaseButton.interactable = canClick;
+
+        if (proceedCaseButtonImage != null)
+        {
+            proceedCaseButtonImage.color = canClick
+                ? new Color(0.05f, 0.55f, 0.65f, 0.98f)
+                : new Color(0.16f, 0.22f, 0.30f, 0.92f);
+        }
+
+        if (proceedCaseButtonLabel != null)
+        {
+            if (canClick)
+            {
+                proceedCaseButtonLabel.text = isCase2 ? "<b>REPLAY CASE 02 ➔</b>" : "<b>PROCEED TO CASE 02 ➔</b>";
+                proceedCaseButtonLabel.color = Color.white;
+            }
+            else
+            {
+                proceedCaseButtonLabel.text = isCase2
+                    ? "<b>WAITING FOR HOST...</b>"
+                    : "<b>WAITING FOR HOST TO START CASE 02...</b>";
+                proceedCaseButtonLabel.color = new Color(0.75f, 0.85f, 0.92f, 0.95f);
+            }
+        }
     }
 
     private void ApplyPolishedEndGameLayout()
@@ -1442,6 +1507,7 @@ public class UIManager : MonoBehaviour
 
     public void ReturnToMainMenu()
     {
+        CaseIntroCutscene.ResetCompletedIntrosForNewMatch();
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
         if (Photon.Pun.PhotonNetwork.IsConnected)
@@ -1469,7 +1535,17 @@ public class UIManager : MonoBehaviour
 
         if (Photon.Pun.PhotonNetwork.InRoom)
         {
-            ShowOnScreenNotification("CASE 02 READY // WAITING FOR ALL PLAYERS...", 999f);
+            // فقط الهوست يملك صلاحية نقل الفريق بأكمله إلى القضية الثانية دفعة واحدة
+            if (!Photon.Pun.PhotonNetwork.IsMasterClient)
+            {
+                ShowOnScreenNotification("WAITING FOR HOST TO START CASE 02...", 4f);
+                return;
+            }
+
+            if (case2TransitionStarted) return;
+            case2TransitionStarted = true;
+
+            ShowOnScreenNotification("LAUNCHING CASE 02 FOR ALL SQUAD MEMBERS...", 5f);
 
             // إعادة ضبط خاصية الإكمال للقضية الجديدة في البروبرتيز مع الاحتفاظ بالدور والجنس
             ExitGames.Client.Photon.Hashtable playerProps = new ExitGames.Client.Photon.Hashtable
@@ -1481,8 +1557,19 @@ public class UIManager : MonoBehaviour
             };
             Photon.Pun.PhotonNetwork.LocalPlayer.SetCustomProperties(playerProps);
 
-            // الهوست فقط يراقب جاهزية الجميع ويبدأ التحميل المتزامن.
+            if (Photon.Pun.PhotonNetwork.CurrentRoom != null)
+            {
+                Photon.Pun.PhotonNetwork.CurrentRoom.SetCustomProperties(new ExitGames.Client.Photon.Hashtable
+                {
+                    { "ActiveCaseScene", nextScene },
+                    { "CollectedEvidenceIDs_Case02", new string[0] },
+                    { "InterrogationStage_Case02", 0 }
+                });
+            }
+
             Photon.Pun.PhotonNetwork.AutomaticallySyncScene = true;
+            Debug.Log("[CASE TRANSITION] Host clicked Proceed. Loading Case02_Main for all players together!");
+            Photon.Pun.PhotonNetwork.LoadLevel(nextScene);
         }
         else
         {
@@ -1493,28 +1580,7 @@ public class UIManager : MonoBehaviour
 
     private void CheckCoopCase2Transition()
     {
-        if (!Photon.Pun.PhotonNetwork.InRoom || !Photon.Pun.PhotonNetwork.IsMasterClient || case2TransitionStarted)
-            return;
-
-        Photon.Realtime.Player[] players = Photon.Pun.PhotonNetwork.PlayerList;
-        if (players == null || players.Length == 0) return;
-
-        foreach (Photon.Realtime.Player player in players)
-        {
-            if (!player.CustomProperties.TryGetValue(Case2ReadyProperty, out object ready) || !(ready is bool) || !(bool)ready)
-                return;
-        }
-
-        case2TransitionStarted = true;
-        if (Photon.Pun.PhotonNetwork.CurrentRoom != null)
-        {
-            Photon.Pun.PhotonNetwork.CurrentRoom.SetCustomProperties(new ExitGames.Client.Photon.Hashtable
-            {
-                { "CollectedEvidenceIDs_Case02", new string[0] }
-            });
-        }
-        Debug.Log("[CASE TRANSITION] All players are ready. Loading Case02_Main together.");
-        Photon.Pun.PhotonNetwork.LoadLevel("Case02_Main");
+        // الهوست ينقل الفريق بأكمله مباشرة عند الضغط على ProceedToNextCase()
     }
 
     public void ToggleSettings()

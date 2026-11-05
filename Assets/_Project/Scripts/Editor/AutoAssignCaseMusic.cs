@@ -2,15 +2,10 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
-[InitializeOnLoad]
 public static class AutoAssignCaseMusic
 {
-    static AutoAssignCaseMusic()
-    {
-        EditorApplication.delayCall += AssignIfCaseScene;
-    }
-
-    private static void AssignIfCaseScene()
+    [MenuItem("Case 2 Setup/Assign Case Music")]
+    public static void AssignIfCaseScene()
     {
         if (Application.isPlaying) return;
         var scene = EditorSceneManager.GetActiveScene();

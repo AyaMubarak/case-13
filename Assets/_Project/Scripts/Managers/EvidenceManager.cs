@@ -165,6 +165,25 @@ public class EvidenceManager : MonoBehaviourPunCallbacks
         return list;
     }
 
+    public void ForceSyncFromRoom(bool showSyncBanner = false)
+    {
+        CacheSceneEvidence();
+        int beforeCount = collectedEvidenceList.Count;
+        SyncCollectedEvidenceFromRoom();
+        int afterCount = collectedEvidenceList.Count;
+
+        if (showSyncBanner && UIManager.Instance != null && afterCount > beforeCount)
+        {
+            UIManager.Instance.ShowOnScreenNotification($"SQUAD DATA UPDATED // SYNCED {afterCount}/{totalEvidence} CLUES", 4.5f);
+        }
+    }
+
+    public override void OnJoinedRoom()
+    {
+        base.OnJoinedRoom();
+        ForceSyncFromRoom(true);
+    }
+
     private void SyncCollectedEvidenceFromRoom(string collectorName = null, string latestClueName = null)
     {
         if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null) return;

@@ -134,7 +134,7 @@ public class CharacterVisualSelector : MonoBehaviour
         {
             if (anim.runtimeAnimatorController == null)
             {
-                Destroy(anim);
+                anim.enabled = false;
                 return;
             }
             anim.applyRootMotion = false;

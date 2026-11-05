@@ -8,10 +8,20 @@ using Photon.Pun;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
 
-public class SeparateInterrogationManager : MonoBehaviour, IOnEventCallback
+public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventCallback
 {
     public static SeparateInterrogationManager Instance { get; private set; }
     public bool AreBothSuspectsCompleted { get; private set; } = false;
+    private int appliedRoomStage = 0;
+
+    private static string RoomInterrogationStageKey
+    {
+        get
+        {
+            bool case02 = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02");
+            return case02 ? "InterrogationStage_Case02" : "InterrogationStage_Case01";
+        }
+    }
 
     private static readonly int IsWalking = Animator.StringToHash("isWalking");
     private static readonly int Speed = Animator.StringToHash("Speed");
@@ -98,14 +108,20 @@ public class SeparateInterrogationManager : MonoBehaviour, IOnEventCallback
     private readonly List<AudioSource> mutedBackgroundSources = new List<AudioSource>();
     private readonly List<bool> previousMuteStates = new List<bool>();
 
-    private void OnEnable()
+    public override void OnEnable()
     {
+        base.OnEnable();
         PhotonNetwork.AddCallbackTarget(this);
+        if (PhotonNetwork.InRoom)
+        {
+            SyncInterrogationStateFromRoom();
+        }
     }
 
-    private void OnDisable()
+    public override void OnDisable()
     {
         PhotonNetwork.RemoveCallbackTarget(this);
+        base.OnDisable();
     }
 
     void Awake()
@@ -297,6 +313,11 @@ public class SeparateInterrogationManager : MonoBehaviour, IOnEventCallback
         if (EvidenceManager.Instance != null && EvidenceManager.Instance.IsCaseComplete())
         {
             OnAllEvidenceGathered();
+        }
+
+        if (PhotonNetwork.InRoom)
+        {
+            SyncInterrogationStateFromRoom();
         }
     }
 
@@ -528,7 +549,14 @@ public class SeparateInterrogationManager : MonoBehaviour, IOnEventCallback
         if (!suspectsStarted)
         {
             suspectsStarted = true;
-            StartSuspectTurn(suspect1);
+            if (PhotonNetwork.InRoom && GetRoomInterrogationStage() >= 2)
+            {
+                SyncInterrogationStateFromRoom();
+            }
+            else
+            {
+                StartSuspectTurn(suspect1);
+            }
         }
     }
 
@@ -558,6 +586,7 @@ public class SeparateInterrogationManager : MonoBehaviour, IOnEventCallback
 
         if (broadcastNetwork && PhotonNetwork.InRoom)
         {
+            SetRoomInterrogationStage(currentSuspectTurn == 1 ? 1 : 3);
             // بث بدء الاستجواب لكافة اللاعبين في الجلسة لتوحيد التجربة
             object[] data = new object[] { currentSuspectTurn };
             PhotonNetwork.RaiseEvent(InterrogationStartEventCode, data,
@@ -1436,6 +1465,8 @@ public class SeparateInterrogationManager : MonoBehaviour, IOnEventCallback
         if (guiltyBoard != null)
         {
             guiltyBoard.SelectSuspect(accusedName);
+            bool isMatch = accusedName.ToLower().Contains("nora") || accusedName.ToLower().Contains("elena");
+            if (isMatch) SetRoomInterrogationStage(5);
         }
         else
         {
@@ -1443,6 +1474,7 @@ public class SeparateInterrogationManager : MonoBehaviour, IOnEventCallback
             bool isGuilty = accusedName.ToLower().Contains("nora") || accusedName.ToLower().Contains("elena");
             if (isGuilty)
             {
+                SetRoomInterrogationStage(5);
                 if (ScoreManager.Instance != null)
                 {
                     ScoreManager.Instance.AddScore(100);
@@ -1555,11 +1587,13 @@ public class SeparateInterrogationManager : MonoBehaviour, IOnEventCallback
 
         if (currentSuspectTurn == 1)
         {
+            SetRoomInterrogationStage(2);
             NextSuspect();
         }
         else if (currentSuspectTurn == 2)
         {
             AreBothSuspectsCompleted = true;
+            SetRoomInterrogationStage(4);
             if (CaseDossierManager.Instance != null)
             {
                 CaseDossierManager.Instance.UnlockDossierAfterInterrogation();
@@ -1719,6 +1753,169 @@ public class SeparateInterrogationManager : MonoBehaviour, IOnEventCallback
                     }
                 }
                 Debug.Log($"<color=green>[PUN SYNC ANIM]</color> Triggered {trigger} on Suspect {sIndex}");
+            }
+        }
+    }
+
+    private int GetRoomInterrogationStage()
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null || PhotonNetwork.CurrentRoom.CustomProperties == null)
+            return 0;
+
+        if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(RoomInterrogationStageKey, out object val) && val is int stage)
+            return stage;
+
+        return 0;
+    }
+
+    private void SetRoomInterrogationStage(int stage)
+    {
+        if (stage > appliedRoomStage)
+            appliedRoomStage = stage;
+
+        if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null) return;
+
+        int currentRoomStage = GetRoomInterrogationStage();
+        if (stage <= currentRoomStage) return;
+
+        ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable
+        {
+            { RoomInterrogationStageKey, stage }
+        };
+        PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+    }
+
+    public override void OnJoinedRoom()
+    {
+        base.OnJoinedRoom();
+        SyncInterrogationStateFromRoom();
+    }
+
+    public override void OnRoomPropertiesUpdate(ExitGames.Client.Photon.Hashtable propertiesThatChanged)
+    {
+        base.OnRoomPropertiesUpdate(propertiesThatChanged);
+        if (propertiesThatChanged != null && propertiesThatChanged.ContainsKey(RoomInterrogationStageKey))
+        {
+            SyncInterrogationStateFromRoom();
+        }
+    }
+
+    public void SyncInterrogationStateFromRoom()
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null) return;
+
+        int stage = GetRoomInterrogationStage();
+        if (stage <= 0 || stage <= appliedRoomStage) return;
+
+        appliedRoomStage = stage;
+        playerSetupComplete = true;
+        suspectsStarted = true;
+
+        Debug.Log($"<color=cyan>[INTERROGATION SYNC]</color> Synchronizing local state to Room Interrogation Stage {stage}");
+
+        if (stage == 1)
+        {
+            currentSuspectTurn = 1;
+            if (!isInterrogating && suspect1 != null && !suspect1.hasReached)
+            {
+                StartSuspectTurn(suspect1);
+                StartInterrogationSequence(false);
+            }
+        }
+        else if (stage == 2)
+        {
+            if (suspect1 != null)
+            {
+                suspect1.hasReached = true;
+                suspect1.isWaitingForInteraction = false;
+                UpdateLogPanelForSuspect(suspect1);
+                if (InterrogationUI.Instance != null)
+                    InterrogationUI.Instance.SetInterrogationRecord(suspect1.suspectName, suspect1.suspectDialogueText, suspect1.suspectPortrait);
+                if (suspect1.suspectObject != null)
+                    suspect1.suspectObject.gameObject.SetActive(false);
+            }
+
+            DeactivateSuspectCamera();
+            NextSuspect();
+        }
+        else if (stage == 3)
+        {
+            if (suspect1 != null)
+            {
+                suspect1.hasReached = true;
+                suspect1.isWaitingForInteraction = false;
+                UpdateLogPanelForSuspect(suspect1);
+                if (InterrogationUI.Instance != null)
+                    InterrogationUI.Instance.SetInterrogationRecord(suspect1.suspectName, suspect1.suspectDialogueText, suspect1.suspectPortrait);
+                if (suspect1.suspectObject != null)
+                    suspect1.suspectObject.gameObject.SetActive(false);
+            }
+
+            currentSuspectTurn = 2;
+            if (!isInterrogating && suspect2 != null && !suspect2.hasReached)
+            {
+                StartSuspectTurn(suspect2);
+                StartInterrogationSequence(false);
+            }
+        }
+        else if (stage >= 4)
+        {
+            StopAllCoroutines();
+            isInterrogating = false;
+            AreBothSuspectsCompleted = true;
+
+            if (suspect1 != null)
+            {
+                suspect1.hasReached = true;
+                suspect1.isWaitingForInteraction = false;
+                UpdateLogPanelForSuspect(suspect1);
+                if (InterrogationUI.Instance != null)
+                    InterrogationUI.Instance.SetInterrogationRecord(suspect1.suspectName, suspect1.suspectDialogueText, suspect1.suspectPortrait);
+                if (suspect1.suspectObject != null)
+                    suspect1.suspectObject.gameObject.SetActive(false);
+            }
+
+            if (suspect2 != null)
+            {
+                suspect2.hasReached = true;
+                suspect2.isWaitingForInteraction = false;
+                UpdateLogPanelForSuspect(suspect2);
+                if (InterrogationUI.Instance != null)
+                    InterrogationUI.Instance.SetInterrogationRecord(suspect2.suspectName, suspect2.suspectDialogueText, suspect2.suspectPortrait);
+                if (suspect2.suspectObject != null)
+                    suspect2.suspectObject.gameObject.SetActive(false);
+            }
+
+            DeactivateSuspectCamera();
+            RestoreInterrogationBackgroundAudio();
+
+            if (CaseDossierManager.Instance != null)
+            {
+                CaseDossierManager.Instance.UnlockDossierAfterInterrogation();
+            }
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.UnlockDossierAccess();
+            }
+
+            ShowTranscriptsButtonAtFilesPosition();
+
+            if (stage == 4)
+            {
+                if (UIManager.Instance != null)
+                {
+                    UIManager.Instance.ShowOnScreenNotification("SQUAD DATA UPDATED // INTERROGATIONS COMPLETED", 4.5f);
+                }
+                OpenLogPanel();
+            }
+            else if (stage >= 5)
+            {
+                CloseLogPanel();
+                if (UIManager.Instance != null)
+                {
+                    UIManager.Instance.ShowOnScreenNotification("CASE SOLVED BY SQUAD // LOADING FINAL REPORT", 3.5f);
+                    UIManager.Instance.ShowEndGameScreen();
+                }
             }
         }
     }

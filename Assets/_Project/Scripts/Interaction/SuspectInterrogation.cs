@@ -1,4 +1,6 @@
 using UnityEngine;
+using Photon.Pun;
+using Photon.Realtime;
 
 public class SuspectInterrogation : MonoBehaviour, IInteractable
 {
@@ -19,12 +21,43 @@ public class SuspectInterrogation : MonoBehaviour, IInteractable
 
     public bool CanInterrogate()
     {
-        // في الطور الفردي (Solo Mode): تجاوز فوري لشرط الدور وفتح الاستجواب بالكامل
-        if (PlayerPrefs.GetInt("Game_Mode", 1) == 0) return true;
+        // في الطور الفردي (Solo Mode) أو إذا لم يكن في غرفة أونلاين نشطة: فتح الاستجواب بالكامل
+        if (PlayerPrefs.GetInt("Game_Mode", 1) == 0 || !PhotonNetwork.InRoom) return true;
 
         if (PlayerProfile.LocalPlayer == null) return true;
-        return PlayerProfile.LocalPlayer.currentRole == DetectiveRole.Interrogator ||
-               PlayerProfile.LocalPlayer.currentRole == DetectiveRole.Any;
+        if (PlayerProfile.LocalPlayer.currentRole == DetectiveRole.Interrogator ||
+            PlayerProfile.LocalPlayer.currentRole == DetectiveRole.Any)
+        {
+            return true;
+        }
+
+        // إذا لم يكن هناك لاعب بدور Interrogator متصل ونشط حالياً في الغرفة (مثلاً خرج أو فصل جهازه أو الفريق أقل من 4)،
+        // نسمح لأي محقق متواجد باستجواب المتهم حتى لا يعلق الفريق أبداً!
+        if (!IsActiveInterrogatorInRoom())
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsActiveInterrogatorInRoom()
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.PlayerList == null) return false;
+
+        foreach (Player p in PhotonNetwork.PlayerList)
+        {
+            if (p == null || p.IsInactive) continue;
+            if (p.CustomProperties != null && p.CustomProperties.TryGetValue("Role", out object roleObj) && roleObj != null)
+            {
+                string r = roleObj.ToString().ToLowerInvariant();
+                if (r.Contains("interrogat"))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public string InteractionPrompt

@@ -19,13 +19,25 @@ public static class PhotonGameplayBootstrap
 
     private static void AddReplicatorIfNeeded()
     {
-        if (!PhotonNetwork.InRoom) return;
+        // إزالة أي عناصر شات قديمة عالقة على الشاشة إن وجدت
+        foreach (PhotonTeamChat oldChat in Object.FindObjectsByType<PhotonTeamChat>(FindObjectsInactive.Include))
+        {
+            if (oldChat != null) Object.Destroy(oldChat);
+        }
+        GameObject oldToggle = GameObject.Find("ChatToggle");
+        if (oldToggle != null) Object.Destroy(oldToggle);
+        GameObject oldPanel = GameObject.Find("TeamChatPanel");
+        if (oldPanel != null) Object.Destroy(oldPanel);
+
         string sceneName = SceneManager.GetActiveScene().name;
         if (!sceneName.StartsWith("Case")) return;
+
+        bool isCoopMode = PlayerPrefs.GetInt("Game_Mode", 1) == 1 || PhotonNetwork.InRoom;
+        if (!isCoopMode) return;
+
         if (Object.FindAnyObjectByType<PhotonGameplayReplicator>() != null) return;
 
         GameObject manager = new GameObject("Photon Gameplay Replicator");
         manager.AddComponent<PhotonGameplayReplicator>();
-        manager.AddComponent<PhotonTeamChat>();
     }
 }

@@ -1,7 +1,10 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Video;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
+using Photon.Pun;
 
 public class CaseIntroCutscene : MonoBehaviour
 {
@@ -19,27 +22,81 @@ public class CaseIntroCutscene : MonoBehaviour
     private bool isCutsceneFinished = false;
     private GameplayMusicController gameplayMusic;
 
+    // يتذكر المشاهد التي تم عرض أو تخطي الفيديو الخاص بها خلال الجلسة حتى لا يتكرر أبداً!
+    private static readonly HashSet<string> completedIntroScenes = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+
     /// <summary>True while the intro plays. Movement, camera look, interaction and evidence collection check this.</summary>
     public static bool IsPlaying { get; private set; }
+
+    public static void ResetCompletedIntrosForNewMatch()
+    {
+        completedIntroScenes.Clear();
+    }
+
+    private static string CurrentSceneIntroRoomKey
+    {
+        get
+        {
+            bool isCase2 = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02");
+            return isCase2 ? "IntroDone_Case02" : "IntroDone_Case01";
+        }
+    }
+
+    private static bool HasIntroAlreadyFinishedInRoomOrSession(string sceneName)
+    {
+        if (completedIntroScenes.Contains(sceneName))
+            return true;
+
+        if (PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties != null)
+        {
+            if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(CurrentSceneIntroRoomKey, out object doneObj) &&
+                doneObj is bool done && done)
+            {
+                completedIntroScenes.Add(sceneName);
+                return true;
+            }
+        }
+
+        if (EvidenceManager.Instance != null && EvidenceManager.Instance.CollectedCount > 0)
+        {
+            completedIntroScenes.Add(sceneName);
+            return true;
+        }
+
+        return false;
+    }
 
     private void Awake()
     {
         gameplayMusic = FindAnyObjectByType<GameplayMusicController>(FindObjectsInactive.Include);
-        if (gameplayMusic != null) gameplayMusic.PauseForOverlay();
 
         ResolveRuntimeReferences();
 
-        // A Case 1 intro can survive in DontDestroyOnLoad when testing the
-        // transition locally. Never allow that video to cover Case 2.
-        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02") &&
-            videoPlayer != null && videoPlayer.clip != null &&
-            !videoPlayer.clip.name.Contains("e41c4fb5"))
+        string activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+
+        // A Case 1 intro can survive or exist as a deactivated duplicate in Case 2.
+        // Never allow that old video to run or cover Case 2.
+        if (activeScene.Contains("Case02") &&
+            (gameObject.name == "CutscenePanel" ||
+             (videoPlayer != null && videoPlayer.clip != null && !videoPlayer.clip.name.Contains("e41c4fb5"))))
         {
-            videoPlayer.Stop();
-            if (cutsceneUIPanel != null) cutsceneUIPanel.SetActive(false);
+            if (videoPlayer != null)
+            {
+                videoPlayer.isLooping = false;
+                videoPlayer.playOnAwake = false;
+                videoPlayer.Stop();
+                videoPlayer.enabled = false;
+            }
+            if (cutsceneUIPanel != null && cutsceneUIPanel.name == "CutscenePanel")
+                cutsceneUIPanel.SetActive(false);
             enabled = false;
-            IsPlaying = false;
-            if (gameplayMusic != null) gameplayMusic.ResumeAfterOverlay();
+            return;
+        }
+
+        // إذا تم عرض الفيديو أو عمل Skip له مسبقاً في هذه القضية، نمنع تشغيله نهائياً!
+        if (HasIntroAlreadyFinishedInRoomOrSession(activeScene))
+        {
+            ForceSilenceAndHideImmediately();
             return;
         }
 
@@ -51,6 +108,12 @@ public class CaseIntroCutscene : MonoBehaviour
             return;
         }
 
+        if (gameplayMusic != null) gameplayMusic.PauseForOverlay();
+
+        // ضمان عدم التكرار التلقائي للفيديو أبداً
+        videoPlayer.isLooping = false;
+        videoPlayer.playOnAwake = false;
+
         IsPlaying = true; // قبل أي Start في باقي السكربتات
 
         EnsureFullscreenLayout();
@@ -58,14 +121,74 @@ public class CaseIntroCutscene : MonoBehaviour
 
         if (skipButton != null)
         {
-            skipButton.onClick.AddListener(EndCutscene);
+            BindSkipActionToButton(skipButton);
         }
 
         if (videoPlayer != null)
         {
-            // استدعاء إنهاء الفيديو تلقائياً عند وصوله للنهاية
+            videoPlayer.loopPointReached -= OnVideoEndReached;
             videoPlayer.loopPointReached += OnVideoEndReached;
         }
+    }
+
+    private void BindSkipActionToButton(Button btn)
+    {
+        if (btn == null) return;
+        btn.onClick.RemoveListener(EndCutscene);
+        btn.onClick.AddListener(EndCutscene);
+
+        EventTrigger trigger = btn.GetComponent<EventTrigger>();
+        if (trigger == null) trigger = btn.gameObject.AddComponent<EventTrigger>();
+        if (trigger.triggers == null) trigger.triggers = new List<EventTrigger.Entry>();
+        trigger.triggers.Clear();
+
+        EventTrigger.Entry clickEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerClick };
+        clickEntry.callback.AddListener((_) => EndCutscene());
+        trigger.triggers.Add(clickEntry);
+
+        EventTrigger.Entry downEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerDown };
+        downEntry.callback.AddListener((_) => EndCutscene());
+        trigger.triggers.Add(downEntry);
+    }
+
+    private void ForceSilenceAndHideImmediately()
+    {
+        isCutsceneFinished = true;
+        IsPlaying = false;
+
+        if (videoPlayer != null)
+        {
+            videoPlayer.isLooping = false;
+            videoPlayer.playOnAwake = false;
+            videoPlayer.Stop();
+            videoPlayer.enabled = false;
+            videoPlayer.gameObject.SetActive(false);
+        }
+
+        if (videoDisplay != null)
+        {
+            videoDisplay.texture = null;
+            videoDisplay.gameObject.SetActive(false);
+        }
+
+        if (cutsceneUIPanel != null)
+        {
+            cutsceneUIPanel.SetActive(false);
+        }
+
+        string[] introRoots = { "Case2_IntroCanvas", "Case2_IntroPanel", "Case2_IntroVideo", "CutscenePanel" };
+        foreach (string rootName in introRoots)
+        {
+            foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            {
+                if (t != null && t.name == rootName)
+                    t.gameObject.SetActive(false);
+            }
+        }
+
+        if (gameplayMusic != null) gameplayMusic.ResumeAfterOverlay();
+        ToggleGameplay(true);
+        enabled = false;
     }
 
     private void ResolveRuntimeReferences()
@@ -96,6 +219,13 @@ public class CaseIntroCutscene : MonoBehaviour
 
     private void Start()
     {
+        string activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        if (isCutsceneFinished || HasIntroAlreadyFinishedInRoomOrSession(activeScene))
+        {
+            EndCutscene();
+            return;
+        }
+
         if (videoPlayer == null || (videoPlayer.clip == null && string.IsNullOrEmpty(videoPlayer.url)))
         {
             EndCutscene();
@@ -106,12 +236,24 @@ public class CaseIntroCutscene : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (videoPlayer != null)
+        {
+            videoPlayer.loopPointReached -= OnVideoEndReached;
+        }
         IsPlaying = false;
     }
 
     private void LateUpdate()
     {
-        if (!IsPlaying) return;
+        if (!IsPlaying || isCutsceneFinished) return;
+
+        // إذا أنهى أحد الزملاء أو ضغط Skip أو تم تحديث حالة الغرفة أثناء العرض، ينتهي فوراً على كل الشاشات
+        string activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        if (HasIntroAlreadyFinishedInRoomOrSession(activeScene))
+        {
+            EndCutscene();
+            return;
+        }
 
         // Some MP4 files do not reliably raise loopPointReached on Android/
         // Unity 6. Finish by time as a fallback so the player is never stuck.
@@ -135,6 +277,14 @@ public class CaseIntroCutscene : MonoBehaviour
 
     public void StartCutscene()
     {
+        if (isCutsceneFinished) return;
+        string activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        if (HasIntroAlreadyFinishedInRoomOrSession(activeScene))
+        {
+            EndCutscene();
+            return;
+        }
+
         isCutsceneFinished = false;
         IsPlaying = true;
 
@@ -151,6 +301,7 @@ public class CaseIntroCutscene : MonoBehaviour
 
         if (videoPlayer != null)
         {
+            videoPlayer.isLooping = false;
             videoPlayer.Play();
         }
     }
@@ -164,12 +315,30 @@ public class CaseIntroCutscene : MonoBehaviour
     {
         if (isCutsceneFinished) return;
         isCutsceneFinished = true;
+        IsPlaying = false;
+
+        string activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        completedIntroScenes.Add(activeScene);
+
+        if (PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null)
+        {
+            PhotonNetwork.CurrentRoom.SetCustomProperties(new ExitGames.Client.Photon.Hashtable
+            {
+                { CurrentSceneIntroRoomKey, true }
+            });
+        }
 
         if (gameplayMusic != null) gameplayMusic.ResumeAfterOverlay();
 
-        if (videoPlayer != null && videoPlayer.isPlaying)
+        if (videoPlayer != null)
         {
+            videoPlayer.loopPointReached -= OnVideoEndReached;
+            videoPlayer.isLooping = false;
+            videoPlayer.playOnAwake = false;
             videoPlayer.Stop();
+            videoPlayer.clip = null;
+            videoPlayer.enabled = false;
+            videoPlayer.gameObject.SetActive(false);
         }
 
         // إخفاء واجهة الفيديو
@@ -178,28 +347,37 @@ public class CaseIntroCutscene : MonoBehaviour
             cutsceneUIPanel.SetActive(false);
         }
 
-        // Also close any authored/duplicated Case 2 intro roots left by an
-        // earlier setup pass. Otherwise the last video frame remains visible
-        // above the gameplay HUD after the video ends.
-        // Case 02 previously contained two intro implementations.  The old
-        // one used CutscenePanel and could remain as a solid white RawImage
-        // after the active video finished.
+        // إغلاق وتعطيل كافة كائنات الفيديو الانترو في المشهد حتى لا يعيد أي مكون تشغيلها أبداً
         string[] introRoots = { "Case2_IntroCanvas", "Case2_IntroPanel", "Case2_IntroVideo", "CutscenePanel" };
         foreach (string rootName in introRoots)
         {
             foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
             {
-                if (t.name == rootName)
+                if (t != null && t.name == rootName)
                     t.gameObject.SetActive(false);
+            }
+        }
+
+        foreach (CaseIntroCutscene otherIntro in Object.FindObjectsByType<CaseIntroCutscene>(FindObjectsInactive.Include))
+        {
+            if (otherIntro != null)
+            {
+                otherIntro.isCutsceneFinished = true;
+                otherIntro.enabled = false;
             }
         }
 
         foreach (VideoPlayer player in Object.FindObjectsByType<VideoPlayer>(FindObjectsInactive.Include))
         {
+            if (player == null) continue;
             string n = player.gameObject.name.ToLowerInvariant();
-            if (n.Contains("intro") || n == "case2_introvideoplayer")
+            if (n.Contains("intro") || n == "case2_introvideoplayer" || n == "cutscenepanel")
             {
+                player.isLooping = false;
+                player.playOnAwake = false;
                 player.Stop();
+                player.clip = null;
+                player.enabled = false;
                 player.gameObject.SetActive(false);
             }
         }
@@ -211,7 +389,6 @@ public class CaseIntroCutscene : MonoBehaviour
         }
 
         // تفعيل التحكم والبدء الفعلي باللعب
-        IsPlaying = false;
         ToggleGameplay(true);
 
         if (UIManager.Instance != null)
@@ -222,6 +399,7 @@ public class CaseIntroCutscene : MonoBehaviour
         }
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+        enabled = false;
     }
 
     private void ToggleGameplay(bool enableState)
@@ -273,6 +451,19 @@ public class CaseIntroCutscene : MonoBehaviour
         {
             skipButton.gameObject.SetActive(true);
             skipButton.transform.SetAsLastSibling();
+            BindSkipActionToButton(skipButton);
+
+            // ربط كل أزرار Skip الموجودة داخل لوحة الانترو بنفس الدالة لضمان عمل الزر من أول ضغطة
+            if (cutsceneUIPanel != null)
+            {
+                foreach (Button b in cutsceneUIPanel.GetComponentsInChildren<Button>(true))
+                {
+                    if (b != null && b.name.ToLowerInvariant().Contains("skip"))
+                    {
+                        BindSkipActionToButton(b);
+                    }
+                }
+            }
         }
     }
 

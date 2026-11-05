@@ -271,7 +271,9 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
         {
             MaxPlayers = 4,
             IsVisible = true,
-            IsOpen = true
+            IsOpen = true,
+            PlayerTtl = 120000,
+            EmptyRoomTtl = 60000
         };
 
         UpdateStatus($"Creating Room {roomCode}...");
@@ -800,6 +802,7 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
 
     public void OnStartGameClicked()
     {
+        CaseIntroCutscene.ResetCompletedIntrosForNewMatch();
         if (PhotonNetwork.IsMasterClient && PhotonNetwork.InRoom)
         {
             if (matchStarting) return;
@@ -822,8 +825,13 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
 
             if (PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers && !HasDuplicateRoles())
             {
+                string targetScene = PlayerPrefs.GetString("Selected_Case", "Case01_Main");
+                PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+                {
+                    { "ActiveCaseScene", targetScene }
+                });
                 UpdateStatus("Loading Game Scene...");
-                PhotonNetwork.LoadLevel(PlayerPrefs.GetString("Selected_Case", "Case01_Main"));
+                PhotonNetwork.LoadLevel(targetScene);
                 yield break;
             }
 

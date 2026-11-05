@@ -141,10 +141,18 @@ public static class LocalTestBootstrap
         GameObject skipButtonObject = null;
         foreach (Button button in Object.FindObjectsByType<Button>(FindObjectsInactive.Include))
         {
-            if (button.name.IndexOf("Skip", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            if (button == null) continue;
+            string btnName = button.name;
+            if (btnName.Equals("SkipIntroButton", System.StringComparison.OrdinalIgnoreCase) ||
+                btnName.Equals("SkipButton", System.StringComparison.OrdinalIgnoreCase))
             {
-                skipButtonObject = button.gameObject;
-                break;
+                if (button.transform.parent != null &&
+                    (button.transform.parent.name.IndexOf("Intro", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     button.transform.parent.name.IndexOf("Cutscene", System.StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    skipButtonObject = button.gameObject;
+                    if (button.gameObject.activeInHierarchy) break;
+                }
             }
         }
         if (skipButtonObject != null)
