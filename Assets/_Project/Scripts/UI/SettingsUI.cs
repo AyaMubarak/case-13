@@ -14,75 +14,52 @@ public class SettingsUI : MonoBehaviour
     public TextMeshProUGUI musicVolumeText;
     public TextMeshProUGUI sfxVolumeText;
 
-    [Header("Game Settings")]
-    public TMP_Dropdown difficultyDropdown;
-    public Toggle invertYToggle;
-
     private void Start()
     {
-        // تهيئة القيم المبدئية عند فتح الشاشة
         if (masterVolumeSlider != null)
         {
+            masterVolumeSlider.onValueChanged.RemoveListener(UpdateMasterVolume);
             masterVolumeSlider.onValueChanged.AddListener(UpdateMasterVolume);
-            masterVolumeSlider.value = PlayerPrefs.GetFloat("MasterVolume", 0.8f);
+            masterVolumeSlider.value = PlayerPrefs.GetFloat("Settings_Master", 0.8f);
             UpdateMasterVolume(masterVolumeSlider.value);
         }
 
         if (musicVolumeSlider != null)
         {
+            musicVolumeSlider.onValueChanged.RemoveListener(UpdateMusicVolume);
             musicVolumeSlider.onValueChanged.AddListener(UpdateMusicVolume);
-            musicVolumeSlider.value = PlayerPrefs.GetFloat("MusicVolume", 0.7f);
+            musicVolumeSlider.value = PlayerPrefs.GetFloat("Settings_Music", 0.7f);
             UpdateMusicVolume(musicVolumeSlider.value);
         }
 
         if (sfxVolumeSlider != null)
         {
+            sfxVolumeSlider.onValueChanged.RemoveListener(UpdateSFXVolume);
             sfxVolumeSlider.onValueChanged.AddListener(UpdateSFXVolume);
-            sfxVolumeSlider.value = PlayerPrefs.GetFloat("SFXVolume", 0.8f);
+            sfxVolumeSlider.value = PlayerPrefs.GetFloat("Settings_SFX", 0.8f);
             UpdateSFXVolume(sfxVolumeSlider.value);
-        }
-
-        if (difficultyDropdown != null)
-        {
-            difficultyDropdown.onValueChanged.AddListener(UpdateDifficulty);
-            difficultyDropdown.value = PlayerPrefs.GetInt("Difficulty", 0); // 0 = Easy
-        }
-
-        if (invertYToggle != null)
-        {
-            invertYToggle.onValueChanged.AddListener(UpdateInvertY);
-            invertYToggle.isOn = PlayerPrefs.GetInt("InvertY", 0) == 1;
         }
     }
 
     private void UpdateMasterVolume(float value)
     {
         if (masterVolumeText != null) masterVolumeText.text = $"{Mathf.RoundToInt(value * 100)}%";
-        PlayerPrefs.SetFloat("MasterVolume", value);
-        // هنا يتم ربط الصوت الحقيقي لاحقاً
+        PlayerPrefs.SetFloat("Settings_Master", value);
+        PlayerPrefs.Save();
+        AudioListener.volume = value;
     }
 
     private void UpdateMusicVolume(float value)
     {
         if (musicVolumeText != null) musicVolumeText.text = $"{Mathf.RoundToInt(value * 100)}%";
-        PlayerPrefs.SetFloat("MusicVolume", value);
+        PlayerPrefs.SetFloat("Settings_Music", value);
+        PlayerPrefs.Save();
     }
 
     private void UpdateSFXVolume(float value)
     {
         if (sfxVolumeText != null) sfxVolumeText.text = $"{Mathf.RoundToInt(value * 100)}%";
-        PlayerPrefs.SetFloat("SFXVolume", value);
-    }
-
-    private void UpdateDifficulty(int index)
-    {
-        PlayerPrefs.SetInt("Difficulty", index);
-        Debug.Log("Difficulty set to: " + index);
-    }
-
-    private void UpdateInvertY(bool isOn)
-    {
-        PlayerPrefs.SetInt("InvertY", isOn ? 1 : 0);
-        Debug.Log("Invert Y Axis: " + isOn);
+        PlayerPrefs.SetFloat("Settings_SFX", value);
+        PlayerPrefs.Save();
     }
 }

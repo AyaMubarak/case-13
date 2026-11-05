@@ -37,10 +37,14 @@ public static class LocalTestBootstrap
 
         GameObject player = move.gameObject;
 
-        // Case 2 uses a first-person camera: do not render the player's own
-        // body/arms when the camera rotates inside the character model.
+        // Case 2 uses a first-person camera: hide the local player's mesh from
+        // the camera while keeping shadows and keeping Renderer.enabled = true
+        // so that the character remains visible in Scene view and when cloned for teammates.
         foreach (Renderer playerRenderer in player.GetComponentsInChildren<Renderer>(true))
-            playerRenderer.enabled = false;
+        {
+            playerRenderer.enabled = true;
+            playerRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+        }
 
         EnsureEvidenceGameplay(player);
 
@@ -155,32 +159,35 @@ public static class LocalTestBootstrap
                 skipRect.sizeDelta = new Vector2(180f, 60f);
                 skipRect.localScale = Vector3.one;
             }
-            Text label = skipButtonObject.GetComponentInChildren<Text>(true);
-            if (label == null)
-            {
-                GameObject labelObject = new GameObject("SkipText", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
-                labelObject.transform.SetParent(skipButtonObject.transform, false);
-                RectTransform labelRect = labelObject.GetComponent<RectTransform>();
-                labelRect.anchorMin = Vector2.zero; labelRect.anchorMax = Vector2.one;
-                labelRect.offsetMin = Vector2.zero; labelRect.offsetMax = Vector2.zero;
-                label = labelObject.GetComponent<Text>();
-            }
-            label.text = "SKIP";
-            label.alignment = TextAnchor.MiddleCenter;
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            label.fontSize = 24;
-            label.fontStyle = FontStyle.Bold;
-            label.color = new Color(0.2f, 0.2f, 0.2f, 1f);
-
+            // Prevent duplicate text labels on the skip button
             TMP_Text tmpLabel = skipButtonObject.GetComponentInChildren<TMP_Text>(true);
             if (tmpLabel != null)
             {
                 tmpLabel.text = "SKIP >>";
                 tmpLabel.alignment = TextAlignmentOptions.Center;
-                tmpLabel.fontSize = 24f;
+                tmpLabel.fontSize = 22f;
                 tmpLabel.fontStyle = FontStyles.Bold;
-                tmpLabel.color = new Color(0.2f, 0.2f, 0.2f, 1f);
+                tmpLabel.color = new Color(0.15f, 0.15f, 0.15f, 1f);
                 tmpLabel.raycastTarget = false;
+            }
+
+            Text legacyLabel = skipButtonObject.GetComponentInChildren<Text>(true);
+            if (legacyLabel != null)
+            {
+                if (tmpLabel != null)
+                {
+                    legacyLabel.text = string.Empty;
+                    legacyLabel.enabled = false;
+                }
+                else
+                {
+                    legacyLabel.text = "SKIP >>";
+                    legacyLabel.alignment = TextAnchor.MiddleCenter;
+                    legacyLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                    legacyLabel.fontSize = 22;
+                    legacyLabel.fontStyle = FontStyle.Bold;
+                    legacyLabel.color = new Color(0.15f, 0.15f, 0.15f, 1f);
+                }
             }
 
             Image skipImage = skipButtonObject.GetComponent<Image>();

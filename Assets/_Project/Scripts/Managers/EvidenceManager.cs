@@ -1,7 +1,11 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Photon.Pun;
+using Photon.Realtime;
+using ExitGames.Client.Photon;
+using Hashtable = ExitGames.Client.Photon.Hashtable;
 
-public class EvidenceManager : MonoBehaviour
+public class EvidenceManager : MonoBehaviourPunCallbacks
 {
     public static EvidenceManager Instance { get; private set; }
 
@@ -20,9 +24,21 @@ public class EvidenceManager : MonoBehaviour
     public GameObject secondSuspect;
 
     private List<Evidence> collectedEvidenceList = new List<Evidence>();
+    private Dictionary<string, Evidence> allEvidenceMap = new Dictionary<string, Evidence>(System.StringComparer.OrdinalIgnoreCase);
     private bool isCaseComplete = false;
 
-    // الخاصية المطلوبة لعد الأدلة
+    private const string LAST_COLLECTOR_KEY = "LastCollector";
+    private const string LAST_CLUE_KEY = "LastClue";
+
+    private static string RoomEvidenceKey
+    {
+        get
+        {
+            bool case02 = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02");
+            return case02 ? "CollectedEvidenceIDs_Case02" : "CollectedEvidenceIDs_Case01";
+        }
+    }
+
     public int CollectedCount => collectedEvidenceList.Count;
 
     private void Awake()
@@ -34,63 +50,199 @@ public class EvidenceManager : MonoBehaviour
         }
         Instance = this;
 
-        // إيقاف التشغيل التلقائي وضبط إعدادات الصوت احتياطياً
         if (allEvidenceCollectedVoice != null)
         {
             allEvidenceCollectedVoice.playOnAwake = false;
             allEvidenceCollectedVoice.loop = false;
-            allEvidenceCollectedVoice.spatialBlend = 0f; // ليكون الصوت 2D ومسموعاً في كل الغرفة
+            allEvidenceCollectedVoice.spatialBlend = 0f;
             allEvidenceCollectedVoice.volume = 1f;
             allEvidenceCollectedVoice.Stop();
         }
 
-        // التأكد من أن المتهمين معطلان تماماً في بداية اللعبة
-        if (firstSuspect != null)
-        {
-            firstSuspect.SetActive(false);
-        }
+        if (firstSuspect != null) firstSuspect.SetActive(false);
+        if (secondSuspect != null) secondSuspect.SetActive(false);
 
-        if (secondSuspect != null)
-        {
-            secondSuspect.SetActive(false);
-        }
+        CacheSceneEvidence();
     }
 
     private void Start()
     {
+        CacheSceneEvidence();
+
         if (UIManager.Instance != null)
         {
-            UIManager.Instance.UpdateEvidenceCount(0, totalEvidence);
+            UIManager.Instance.UpdateEvidenceCount(collectedEvidenceList.Count, totalEvidence);
+        }
+
+        // مزامنة حالة الأدلة في حال كان اللاعب متصلاً بغرفة مسبقاً
+        if (PhotonNetwork.InRoom)
+        {
+            SyncCollectedEvidenceFromRoom();
+        }
+    }
+
+    public override void OnEnable()
+    {
+        base.OnEnable();
+        CacheSceneEvidence();
+        if (PhotonNetwork.InRoom)
+        {
+            SyncCollectedEvidenceFromRoom();
+        }
+    }
+
+    private void CacheSceneEvidence()
+    {
+        Evidence[] sceneEvidences = FindObjectsByType<Evidence>(FindObjectsInactive.Include);
+        foreach (Evidence ev in sceneEvidences)
+        {
+            if (ev != null && !string.IsNullOrEmpty(ev.evidenceID))
+            {
+                if (!allEvidenceMap.ContainsKey(ev.evidenceID))
+                {
+                    allEvidenceMap.Add(ev.evidenceID, ev);
+                }
+            }
         }
     }
 
     public void CollectEvidence(Evidence evidence)
+    {
+        if (evidence == null) return;
+
+        // 1. مزامنة الدليل مع شبكة Photon إذا كنا في غرفة
+        if (PhotonNetwork.InRoom)
+        {
+            List<string> currentIDs = GetRoomCollectedEvidenceIDs();
+            if (!currentIDs.Contains(evidence.evidenceID))
+            {
+                currentIDs.Add(evidence.evidenceID);
+
+                string collectorName = string.IsNullOrEmpty(PhotonNetwork.NickName) ? "A DETECTIVE" : PhotonNetwork.NickName;
+
+                Hashtable props = new Hashtable
+                {
+                    { RoomEvidenceKey, currentIDs.ToArray() },
+                    { LAST_COLLECTOR_KEY, collectorName },
+                    { LAST_CLUE_KEY, evidence.evidenceName }
+                };
+
+                PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+            }
+        }
+
+        // 2. معالجة الدليل محلياً
+        ApplyEvidenceLocally(evidence, PhotonNetwork.NickName, true);
+    }
+
+    // كولباك استلام تحديثات الغرفة من شبكة Photon لجميع اللاعبين الأربعة
+    public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+    {
+        if (propertiesThatChanged.ContainsKey(RoomEvidenceKey))
+        {
+            string collector = propertiesThatChanged.ContainsKey(LAST_COLLECTOR_KEY) && propertiesThatChanged[LAST_COLLECTOR_KEY] != null
+                ? propertiesThatChanged[LAST_COLLECTOR_KEY].ToString()
+                : "A DETECTIVE";
+
+            string clueName = propertiesThatChanged.ContainsKey(LAST_CLUE_KEY) && propertiesThatChanged[LAST_CLUE_KEY] != null
+                ? propertiesThatChanged[LAST_CLUE_KEY].ToString()
+                : "";
+
+            SyncCollectedEvidenceFromRoom(collector, clueName);
+        }
+    }
+
+    private List<string> GetRoomCollectedEvidenceIDs()
+    {
+        List<string> list = new List<string>();
+        if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null) return list;
+
+        if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(RoomEvidenceKey, out object val) && val is string[] ids)
+        {
+            list.AddRange(ids);
+        }
+
+        return list;
+    }
+
+    private void SyncCollectedEvidenceFromRoom(string collectorName = null, string latestClueName = null)
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null) return;
+
+        List<string> roomIDs = GetRoomCollectedEvidenceIDs();
+        bool newlyAddedAny = false;
+
+        foreach (string id in roomIDs)
+        {
+            if (allEvidenceMap.TryGetValue(id, out Evidence ev) && ev != null)
+            {
+                if (!collectedEvidenceList.Contains(ev))
+                {
+                    ApplyEvidenceLocally(ev, collectorName, false);
+                    newlyAddedAny = true;
+                }
+                else
+                {
+                    // التأكد من إخفاء المجسم من الغرفة لجميع اللاعبين
+                    if (ev.gameObject.activeSelf)
+                    {
+                        ev.gameObject.SetActive(false);
+                    }
+                }
+            }
+        }
+
+        if (newlyAddedAny && !string.IsNullOrEmpty(latestClueName) && UIManager.Instance != null)
+        {
+            string displayName = string.IsNullOrEmpty(collectorName) ? "TEAM" : collectorName.ToUpperInvariant();
+            UIManager.Instance.ShowOnScreenNotification($"{displayName} SECURED CLUE: {latestClueName.ToUpper()}");
+        }
+    }
+
+    private void ApplyEvidenceLocally(Evidence evidence, string collectorName, bool showLocalNotification)
     {
         if (collectedEvidenceList.Contains(evidence))
             return;
 
         collectedEvidenceList.Add(evidence);
 
+        // إخفاء كائن الدليل من المشهد لكي لا يظهر مجدداً
+        if (evidence.gameObject.activeSelf)
+        {
+            evidence.gameObject.SetActive(false);
+        }
+
         int currentCount = collectedEvidenceList.Count;
 
-        // تحديث العداد على الشاشة
+        // تحديث ملف استبعاد المشتبه بهم (Case Dossier)
+        if (CaseDossierManager.Instance != null)
+        {
+            CaseDossierManager.Instance.ProcessEvidenceCollected(evidence);
+        }
+
+        // تحديث واجهة المستخدم (العداد والحقيبة) لجميع اللاعبين
         if (UIManager.Instance != null)
         {
             UIManager.Instance.UpdateEvidenceCount(currentCount, totalEvidence);
+            UIManager.Instance.UnlockInventoryAccess();
 
-            // تفعيل الحقيبة وتنبيه اللاعب عند جمع أول دليل
-            if (currentCount == 1)
+            if (showLocalNotification)
             {
-                UIManager.Instance.UnlockInventoryAccess();
-                UIManager.Instance.ShowOnScreenNotification("FIRST CLUE SECURED! PRESS [TAB] OR OPEN INVENTORY TO VIEW");
+                if (currentCount == 1)
+                {
+                    UIManager.Instance.ShowOnScreenNotification("FIRST CLUE SECURED! OPEN INVENTORY TO VIEW");
+                }
+                else
+                {
+                    UIManager.Instance.ShowOnScreenNotification($"CLUE SECURED: {evidence.evidenceName.ToUpper()}");
+                }
             }
-            else
-            {
-                UIManager.Instance.ShowOnScreenNotification($"CLUE SECURED: {evidence.evidenceName.ToUpper()}");
-            }
+
+            // تحديث محتويات الحقيبة لو كانت مفتوحة حالياً
+            UIManager.Instance.RefreshEvidenceList();
         }
 
-        // فحص شرط اكتمال جميع الأدلة
+        // فحص اكتمال جميع الأدلة
         if (currentCount >= totalEvidence && !isCaseComplete)
         {
             TriggerCaseCompletion();
@@ -107,7 +259,6 @@ public class EvidenceManager : MonoBehaviour
             UIManager.Instance.ShowOnScreenNotification("ALL EVIDENCE COLLECTED // PROCEED TO DEDUCTION");
         }
 
-        // تشغيل صوت اكتمال الأدلة
         if (allEvidenceCollectedVoice != null)
         {
             allEvidenceCollectedVoice.gameObject.SetActive(true);
@@ -118,14 +269,12 @@ public class EvidenceManager : MonoBehaviour
             }
         }
 
-        // تفعيل المتهم الأول فوراً ليظهر عند الباب ويبدأ التحقيق معه
         if (firstSuspect != null)
         {
             firstSuspect.SetActive(true);
             Debug.Log("<color=yellow>[INTERROGATION]</color> First suspect activated at the door!");
         }
 
-        // إطلاق الحدث العام لأي سكربتات أخرى تستمع إليه
         OnAllEvidenceCollected?.Invoke();
     }
 

@@ -86,6 +86,20 @@ public class CaseDossierManager : MonoBehaviour
             closeDossierBtn.onClick.AddListener(CloseDossier);
         }
 
+        // ربط أي أزرار إغلاق إضافية داخل dossierPanel لضمان إغلاق اللوحة تحت أي ظرف
+        if (dossierPanel != null)
+        {
+            Button[] allButtons = dossierPanel.GetComponentsInChildren<Button>(true);
+            foreach (Button b in allButtons)
+            {
+                if (b != null && b.name.IndexOf("Close", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    b.onClick.RemoveListener(CloseDossier);
+                    b.onClick.AddListener(CloseDossier);
+                }
+            }
+        }
+
         if (backToGridBtn != null)
         {
             backToGridBtn.onClick.RemoveAllListeners();
@@ -187,6 +201,20 @@ public class CaseDossierManager : MonoBehaviour
             closeDossierBtn.onClick.AddListener(CloseDossier);
         }
 
+        // ربط أي أزرار إغلاق إضافية داخل dossierPanel لضمان إغلاق اللوحة تحت أي ظرف
+        if (dossierPanel != null)
+        {
+            Button[] allButtons = dossierPanel.GetComponentsInChildren<Button>(true);
+            foreach (Button b in allButtons)
+            {
+                if (b != null && b.name.IndexOf("Close", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    b.onClick.RemoveListener(CloseDossier);
+                    b.onClick.AddListener(CloseDossier);
+                }
+            }
+        }
+
         // البحث التلقائي عن زر ملف المتهمين في المشهد إن لم يكن مربوطاً في الـ Inspector
         if (generalDossierIconBtn == null)
         {
@@ -194,7 +222,7 @@ public class CaseDossierManager : MonoBehaviour
             if (foundBtn != null) generalDossierIconBtn = foundBtn;
         }
 
-        // ضبط حالة الأيقونات مبدئياً وربط حدث الضغط
+        // أيقونة ملف المشتبه فيهم تبقى ظاهرة دائماً؛ القفل يخص المحتوى فقط.
         if (generalDossierIconBtn != null)
         {
             generalDossierIconBtn.SetActive(true);
@@ -210,10 +238,29 @@ public class CaseDossierManager : MonoBehaviour
         CheckSuspectsCountAndSwitchIcons();
     }
 
+    private void Update()
+    {
+        // إغلاق ملف التحقيق فوراً عند الضغط على زر الهروب (Escape) أو زر الرجوع في الجوال/الكمبيوتر
+        if (IsDossierOpen)
+        {
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                if (suspectDetailsPanel != null && suspectDetailsPanel.activeSelf)
+                {
+                    CloseDetailsPanel();
+                }
+                else
+                {
+                    CloseDossier();
+                }
+            }
+        }
+    }
+
     private void ResolveDossierUIReferences()
     {
-        if (dossierPanel == null) dossierPanel = FindUIObject("DossierPanel");
-        if (suspectDetailsPanel == null) suspectDetailsPanel = FindUIObject("SuspectDetailsPanel");
+        if (dossierPanel == null) dossierPanel = FindUIObject("DossierPanel", "Dossier", "SuspectsPanel", "SuspectPanel", "CaseDossierPanel");
+        if (suspectDetailsPanel == null) suspectDetailsPanel = FindUIObject("SuspectDetailsPanel", "SuspectDetailPanel", "DetailsPanel");
         if (findingSummaryText == null) findingSummaryText = FindUIText("FindingSummaryText", "EvidenceFindingText");
         if (detailPortrait == null) detailPortrait = FindUIImageInRoot(suspectDetailsPanel, "Detail_Portrait", "SuspectPortrait_UI", "DetailPortrait");
         if (detailNameText == null) detailNameText = FindUITextInRoot(suspectDetailsPanel, "Detail_NameText", "DetailName", "DetailNameText");
@@ -224,7 +271,22 @@ public class CaseDossierManager : MonoBehaviour
         if (finalSuspectsIconBtn == null) finalSuspectsIconBtn = FindUIObject("Btn_FinalSuspects");
         if (interrogationPromptUI == null) interrogationPromptUI = FindUIObject("InterrogationPrompt");
 
-        if (closeDossierBtn == null) closeDossierBtn = FindUIButton("CloseDossierBtn", "CloseDossier", "Close");
+        // البحث الدقيق أولاً داخل dossierPanel لتجنب جلب أزرار إغلاق أخرى (مثل CloseBtn الخاص بلوحة الاستجواب)
+        if (closeDossierBtn == null && dossierPanel != null)
+        {
+            Button[] buttonsInDossier = dossierPanel.GetComponentsInChildren<Button>(true);
+            foreach (Button b in buttonsInDossier)
+            {
+                if (b != null && (b.name.Equals("CloseDossierBtn", System.StringComparison.OrdinalIgnoreCase) ||
+                                  b.name.IndexOf("Close", System.StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    closeDossierBtn = b;
+                    break;
+                }
+            }
+        }
+
+        if (closeDossierBtn == null) closeDossierBtn = FindUIButton("CloseDossierBtn", "CloseDossier");
         if (backToGridBtn == null) backToGridBtn = FindUIButton("BackToGridBtn", "Back", "CloseDetails");
         if (manualEliminateBtn == null) manualEliminateBtn = FindUIButton("ManualEliminateBtn", "Eliminate", "Accuse");
 
@@ -235,8 +297,7 @@ public class CaseDossierManager : MonoBehaviour
                 string.CompareOrdinal(a != null ? a.name : string.Empty, b != null ? b.name : string.Empty));
         }
 
-        // Make the dossier cover the actual screen, not the old fixed 1920x1080
-        // rectangle from the source scene.
+        // Make the dossier cover the actual screen
         if (dossierPanel != null)
         {
             RectTransform rect = dossierPanel.GetComponent<RectTransform>();
@@ -252,6 +313,8 @@ public class CaseDossierManager : MonoBehaviour
             Canvas canvas = dossierPanel.GetComponentInParent<Canvas>(true);
             if (canvas != null)
             {
+                canvas.overrideSorting = true;
+                canvas.sortingOrder = 500;
                 CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
                 if (scaler == null) scaler = canvas.gameObject.AddComponent<CanvasScaler>();
                 scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -272,10 +335,15 @@ public class CaseDossierManager : MonoBehaviour
         return false;
     }
 
-    private static GameObject FindUIObject(string objectName)
+    private static GameObject FindUIObject(params string[] objectNames)
     {
         foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
-            if (t.name == objectName) return t.gameObject;
+        {
+            foreach (string name in objectNames)
+            {
+                if (t.name.Equals(name, System.StringComparison.OrdinalIgnoreCase)) return t.gameObject;
+            }
+        }
         return null;
     }
 
@@ -346,7 +414,10 @@ public class CaseDossierManager : MonoBehaviour
         }
 
         CloseDetailsPanel();
-        OpenDossier();
+        if (SeparateInterrogationManager.Instance == null || SeparateInterrogationManager.Instance.AreBothSuspectsCompleted)
+        {
+            OpenDossier();
+        }
 
         // استبعاد المشتبه به تلقائياً المرتبط بهذا الدليل إن وُجد
         if (evidence != null && !string.IsNullOrEmpty(evidence.eliminatesSuspectID))
@@ -660,7 +731,8 @@ public class CaseDossierManager : MonoBehaviour
                 if (title != null)
                 {
                     title.text = "<color=#00E5FF><b>CASE DOSSIER</b></color>  <color=#607D8B>//</color>  <color=#B0BEC5>COLLECTED EVIDENCE ARCHIVE</color>";
-                    title.fontSize = 25f;
+                    float titleWidth = pRect != null ? pRect.rect.width : 1920f;
+                    title.fontSize = Mathf.Clamp(titleWidth * 0.013f, 17f, 25f);
                     title.alignment = TextAlignmentOptions.Left;
                     RectTransform titleRect = title.GetComponent<RectTransform>();
                     if (titleRect != null)
@@ -684,53 +756,94 @@ public class CaseDossierManager : MonoBehaviour
                 sumRect.anchorMax = new Vector2(0.5f, 1f);
                 sumRect.pivot = new Vector2(0.5f, 1f);
                 sumRect.anchoredPosition = new Vector2(0f, -40f);
-                sumRect.sizeDelta = new Vector2(900f, 100f);
+                float dossierWidth = dossierPanel != null && dossierPanel.GetComponent<RectTransform>() != null
+                    ? dossierPanel.GetComponent<RectTransform>().rect.width : 1920f;
+                sumRect.sizeDelta = new Vector2(Mathf.Min(900f, dossierWidth - 64f), 100f);
             }
             findingSummaryText.alignment = TextAlignmentOptions.Center;
-            findingSummaryText.fontSize = 24f;
+            findingSummaryText.fontSize = Mathf.Clamp((dossierPanel != null ? dossierPanel.GetComponent<RectTransform>().rect.width : 1920f) * 0.012f, 16f, 24f);
         }
 
-        // 3. تنسيق زر إغلاق لوحة المتهمين (Close Button) وضمان وضوحه
+        // 3. تنسيق زر إغلاق لوحة المتهمين (Close Button) وضمان وضوحه وسهولة لمسه
+        if (closeDossierBtn == null && dossierPanel != null)
+        {
+            Button[] bList = dossierPanel.GetComponentsInChildren<Button>(true);
+            foreach (Button b in bList)
+            {
+                if (b != null && (b.name.Equals("CloseDossierBtn", System.StringComparison.OrdinalIgnoreCase) ||
+                                  b.name.IndexOf("Close", System.StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    closeDossierBtn = b;
+                    break;
+                }
+            }
+        }
+
         if (closeDossierBtn != null)
         {
+            closeDossierBtn.gameObject.SetActive(true);
             closeDossierBtn.transform.SetAsLastSibling();
+            float closeSize = 76f;
             RectTransform closeRect = closeDossierBtn.GetComponent<RectTransform>();
             if (closeRect != null)
             {
                 closeRect.anchorMin = new Vector2(1f, 1f);
                 closeRect.anchorMax = new Vector2(1f, 1f);
                 closeRect.pivot = new Vector2(1f, 1f);
-                closeRect.anchoredPosition = new Vector2(-28f, -28f);
-                closeRect.sizeDelta = new Vector2(64f, 64f);
+                // إبعاد الزر عن زاوية الشاشة لتفادي النوتش في الآيفون وهواتف الأندرويد، وتكبير مساحة اللمس
+                float closeInset = dossierPanel != null && dossierPanel.GetComponent<RectTransform>() != null && dossierPanel.GetComponent<RectTransform>().rect.width < 1200f ? 24f : 60f;
+                closeSize = dossierPanel != null && dossierPanel.GetComponent<RectTransform>() != null && dossierPanel.GetComponent<RectTransform>().rect.width < 900f ? 60f : 76f;
+                closeRect.anchoredPosition = new Vector2(-closeInset, -Mathf.Max(20f, closeInset * 0.67f));
+                closeRect.sizeDelta = new Vector2(closeSize, closeSize);
             }
             Image closeImage = closeDossierBtn.GetComponent<Image>();
-            if (closeImage != null) closeImage.color = new Color(0.86f, 0.16f, 0.20f, 1f);
+            if (closeImage != null)
+            {
+                closeImage.raycastTarget = true;
+                closeImage.color = new Color(0.92f, 0.18f, 0.22f, 1f);
+            }
             TMP_Text closeText = closeDossierBtn.GetComponentInChildren<TMP_Text>(true);
             if (closeText != null)
             {
+                closeText.raycastTarget = false;
                 closeText.text = "×";
-                closeText.fontSize = 32f;
+                closeText.fontSize = Mathf.Clamp(closeSize * 0.5f, 28f, 38f);
                 closeText.alignment = TextAlignmentOptions.Center;
                 closeText.color = Color.white;
             }
+
+            closeDossierBtn.onClick.RemoveListener(CloseDossier);
+            closeDossierBtn.onClick.AddListener(CloseDossier);
         }
 
-        // 4. تنسيق بطاقات المتهمين الخمسة وترتيبها في صف متناسق أفقي
+        // 4. ترتيب البطاقات في صف واحد: القضيّة تحتوي خمسة مشتبهين ويجب أن
+        // يظهروا جنبًا إلى جنب بدل أن تنزل البطاقة الخامسة لسطر جديد.
         if (cardSlots != null && cardSlots.Length > 0)
         {
-            // إذا كانت الحاوية تحتوي HorizontalLayoutGroup نتركها ترتبها تلقائياً، وإلا نرتبها يدوياً
-            HorizontalLayoutGroup hlg = cardSlots[0] != null && cardSlots[0].transform.parent != null 
-                ? cardSlots[0].transform.parent.GetComponent<HorizontalLayoutGroup>() 
+            Transform cardParent = cardSlots[0] != null ? cardSlots[0].transform.parent : null;
+            HorizontalLayoutGroup hlg = cardParent != null
+                ? cardParent.GetComponent<HorizontalLayoutGroup>()
                 : null;
+            if (hlg != null)
+                hlg.enabled = false;
 
-            if (hlg == null)
+            RectTransform cardsRect = cardParent as RectTransform;
+            if (cardsRect != null)
             {
-                float totalWidth = 920f;
-                float cardWidth = 160f;
-                float cardHeight = 220f;
                 int count = cardSlots.Length;
-                float spacing = (totalWidth - (cardWidth * count)) / Mathf.Max(1, count - 1);
-                float startX = -(totalWidth * 0.5f) + (cardWidth * 0.5f);
+                float availableWidth = cardsRect.rect.width > 10f ? cardsRect.rect.width : 1920f;
+                float availableHeight = cardsRect.rect.height > 10f ? cardsRect.rect.height : 1080f;
+                bool compact = availableWidth < 1450f || availableHeight < 800f;
+                int columns = count;
+                float gap = compact ? 10f : 18f;
+                float margin = compact ? 18f : 32f;
+                float cardWidth = Mathf.Min(360f, (availableWidth - margin * 2f - gap * (columns - 1)) / columns);
+                float cardHeight = Mathf.Clamp(compact ? availableHeight * 0.30f : availableHeight * 0.36f, 180f, 300f);
+                float contentTop = -Mathf.Max(150f, availableHeight * 0.20f);
+                int rows = Mathf.CeilToInt(count / (float)columns);
+                float totalHeight = rows * cardHeight + Mathf.Max(0, rows - 1) * gap;
+                float startX = -(columns - 1) * (cardWidth + gap) * 0.5f;
+                float startY = contentTop - cardHeight * 0.5f;
 
                 for (int i = 0; i < count; i++)
                 {
@@ -742,7 +855,9 @@ public class CaseDossierManager : MonoBehaviour
                         cardRect.anchorMax = new Vector2(0.5f, 0.5f);
                         cardRect.pivot = new Vector2(0.5f, 0.5f);
                         cardRect.sizeDelta = new Vector2(cardWidth, cardHeight);
-                        cardRect.anchoredPosition = new Vector2(startX + i * (cardWidth + spacing), -50f);
+                        int row = i / columns;
+                        int column = i % columns;
+                        cardRect.anchoredPosition = new Vector2(startX + column * (cardWidth + gap), startY - row * (cardHeight + gap) + totalHeight * 0.5f);
                     }
                 }
             }
@@ -775,25 +890,27 @@ public class CaseDossierManager : MonoBehaviour
     // تُستدعى كلما استُبعد متهم بعد حل سؤال أي دليل
     public void CheckSuspectsCountAndSwitchIcons()
     {
-        // حساب كم مشتبه به ما زال قيد الاتهام ولم يُستبعد
-        int activeSuspectsCount = 0;
-        foreach (var suspect in suspects)
+        // الأيقونة العامة تبقى ظاهرة دائماً ويمكن فتحها في أي وقت.
+        if (SeparateInterrogationManager.Instance != null && !SeparateInterrogationManager.Instance.AreBothSuspectsCompleted)
         {
-            if (suspect != null && !suspect.isEliminated)
-            {
-                activeSuspectsCount++;
-            }
+            if (generalDossierIconBtn != null) generalDossierIconBtn.SetActive(true);
+            if (finalSuspectsIconBtn != null) finalSuspectsIconBtn.SetActive(false);
+            return;
         }
 
-        // إذا بقي 2 فقط (إيفان ونورا)
-        if (activeSuspectsCount <= 2 && suspects.Count > 0)
+        // بعد إنهاء محادثة المتهمين الاثنين ننتقل مباشرة إلى صفحة المتهمين
+        // الأساسيين. لا نعتمد على عدد البطاقات غير المستبعدة هنا، لأن
+        // المتهمين الأساسيين (Evan/Nora أو Victor/Elena) لا يتم استبعادهما.
+        if (SeparateInterrogationManager.Instance != null &&
+            SeparateInterrogationManager.Instance.AreBothSuspectsCompleted &&
+            suspects.Count > 0)
         {
-            Debug.Log("<color=yellow>[TRANSITION] Only Evan & Nora remain! Final Suspects Phase.</color>");
+            Debug.Log("<color=yellow>[TRANSITION] Both interrogations completed! Final Suspects Phase.</color>");
 
             // إظهار أيقونة المتهمين الأساسيين الحاسمة في الـ HUD إن وُجدت
             if (finalSuspectsIconBtn != null)
             {
-                if (generalDossierIconBtn != null) generalDossierIconBtn.SetActive(false);
+                if (generalDossierIconBtn != null) generalDossierIconBtn.SetActive(true);
                 finalSuspectsIconBtn.SetActive(true);
             }
         }
@@ -830,13 +947,39 @@ public class CaseDossierManager : MonoBehaviour
         }
     }
 
+    public void UnlockDossierAfterInterrogation()
+    {
+        ResolveDossierUIReferences();
+        if (generalDossierIconBtn != null)
+        {
+            generalDossierIconBtn.SetActive(true);
+        }
+        CheckSuspectsCountAndSwitchIcons();
+        Debug.Log("<color=green>[CaseDossierManager] Dossier unlocked after completing both suspect interrogations!</color>");
+    }
+
     public void OpenDossier()
     {
-        // Resolve again on every open because Case 1 and Case 2 can have
-        // different canvases while persistent managers survive scene changes.
+        // Keep the HUD icon visible, but lock the dossier contents until
+        // both Case 2 suspects have completed their interrogations.
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02") &&
+            (SeparateInterrogationManager.Instance == null ||
+             !SeparateInterrogationManager.Instance.AreBothSuspectsCompleted))
+        {
+            if (UIManager.Instance != null)
+                UIManager.Instance.ShowOnScreenNotification("CASE DOSSIER LOCKED // COMPLETE BOTH INTERROGATIONS FIRST", 3.5f);
+            return;
+        }
+
         ResolveDossierUIReferences();
         if (dossierPanel == null)
-            dossierPanel = FindUIObject("DossierPanel");
+            dossierPanel = FindUIObject("DossierPanel", "Dossier", "SuspectsPanel", "SuspectPanel", "CaseDossierPanel");
+
+        if (dossierPanel == null)
+        {
+            Debug.LogError("[CaseDossierManager] DossierPanel was not found in this scene!");
+            return;
+        }
 
         SetMobileControls(false);
 
@@ -846,15 +989,43 @@ public class CaseDossierManager : MonoBehaviour
             UIManager.Instance.ToggleInventory();
         }
 
+        Canvas parentCanvas = dossierPanel.GetComponentInParent<Canvas>(true);
+        if (parentCanvas != null)
+        {
+            parentCanvas.gameObject.SetActive(true);
+            parentCanvas.enabled = true;
+            parentCanvas.overrideSorting = true;
+            parentCanvas.sortingOrder = 500;
+        }
+
         ApplyPolishedDossierMainLayout();
         RefreshCards();
+
+        dossierPanel.SetActive(true);
+        dossierPanel.transform.SetAsLastSibling();
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        if (closeDossierBtn != null)
+        {
+            closeDossierBtn.onClick.RemoveAllListeners();
+            closeDossierBtn.onClick.AddListener(CloseDossier);
+        }
+
+        // ربط أي أزرار إغلاق إضافية داخل dossierPanel لضمان إغلاق اللوحة تحت أي ظرف
         if (dossierPanel != null)
         {
-            dossierPanel.SetActive(true);
-            dossierPanel.transform.SetAsLastSibling();
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            Button[] allButtons = dossierPanel.GetComponentsInChildren<Button>(true);
+            foreach (Button b in allButtons)
+            {
+                if (b != null && b.name.IndexOf("Close", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    b.onClick.RemoveListener(CloseDossier);
+                    b.onClick.AddListener(CloseDossier);
+                }
+            }
         }
+
         if (suspectDetailsPanel != null) suspectDetailsPanel.SetActive(false);
     }
 

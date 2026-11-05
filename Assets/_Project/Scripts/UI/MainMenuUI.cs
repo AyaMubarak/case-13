@@ -5,6 +5,8 @@ using TMPro;
 
 public class MainMenuUI : MonoBehaviour
 {
+    public static MainMenuUI Instance { get; private set; }
+
     [Header("Main Menu Panels")]
     public GameObject mainMenuPanel;
     public GameObject settingsPanel;
@@ -15,8 +17,11 @@ public class MainMenuUI : MonoBehaviour
     [Header("Lobby Settings")]
     public Button startGameBtn;
 
+    public static string SelectedCaseScene = "Case01_Main";
+
     private void Awake()
     {
+        if (Instance == null) Instance = this;
         EnsureResponsiveCanvases();
         ResolvePanels();
     }
@@ -25,10 +30,12 @@ public class MainMenuUI : MonoBehaviour
     {
         EnsureResponsiveCanvases();
 
+        // تهيئة اتصال الشبكة مسبقاً في الخلفية لتسريع الدخول الفوري للطور الجماعي
+        LobbyUIManager.EnsureConnectedGlobal();
+
         // إظهار القائمة الرئيسية فقط في البداية
         OpenMainMenu();
 
-        // إخفاء الماوس إذا كان مخفياً وإظهاره
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
@@ -40,7 +47,7 @@ public class MainMenuUI : MonoBehaviour
     {
         Canvas[] canvases = GetComponentsInParent<Canvas>(true);
         if (canvases == null || canvases.Length == 0)
-            canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Include);
 
         foreach (Canvas canvas in canvases)
         {
@@ -51,21 +58,38 @@ public class MainMenuUI : MonoBehaviour
 
     public void OpenMainMenu()
     {
-        mainMenuPanel.SetActive(true);
-        if(settingsPanel != null) settingsPanel.SetActive(false);
-        if(characterSelectPanel != null) characterSelectPanel.SetActive(false);
-        if(lobbyPanel != null) lobbyPanel.SetActive(false);
-        if(quitPanel != null) quitPanel.SetActive(false);
+        if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (characterSelectPanel != null) characterSelectPanel.SetActive(false);
+        if (lobbyPanel != null) lobbyPanel.SetActive(false);
+        if (quitPanel != null) quitPanel.SetActive(false);
+        if (mainMenuPanel != null)
+        {
+            mainMenuPanel.transform.SetAsLastSibling();
+            mainMenuPanel.SetActive(true);
+        }
     }
 
     public void OpenSettings()
     {
-        if(settingsPanel != null) settingsPanel.SetActive(true);
+        if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
+        if (settingsPanel != null)
+        {
+            settingsPanel.transform.SetAsLastSibling();
+            settingsPanel.SetActive(true);
+        }
+    }
+
+    // فتح واجهة اختيار نمط اللعب (فردي Solo أو جماعي Co-op) بنفس ديزاين اللوبي
+    public void OpenGameModeSelect()
+    {
+        GameModeSelectUI modeUI = GetComponent<GameModeSelectUI>();
+        if (modeUI == null) modeUI = gameObject.AddComponent<GameModeSelectUI>();
+        modeUI.Open();
     }
 
     public void OpenCharacterSelect()
     {
-        mainMenuPanel.SetActive(false);
+        if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
         if (lobbyPanel != null) lobbyPanel.SetActive(false);
         if (characterSelectPanel != null) characterSelectPanel.SetActive(true);
@@ -131,13 +155,12 @@ public class MainMenuUI : MonoBehaviour
             }
             else if (key.Contains("play") || key.Contains("start") || key.Contains("case") || key.Contains("begin"))
             {
-                button.onClick.RemoveListener(OpenCharacterSelect);
-                button.onClick.AddListener(OpenCharacterSelect);
+                // توجيه زر بدء اللعبة إلى شاشة اختيار النمط (فردي أو جماعي)
+                button.onClick.RemoveListener(OpenGameModeSelect);
+                button.onClick.AddListener(OpenGameModeSelect);
             }
         }
     }
-
-    public static string SelectedCaseScene = "Case01_Main";
 
     public void SelectCase1()
     {
@@ -175,7 +198,7 @@ public class MainMenuUI : MonoBehaviour
 
     public void OpenQuitPanel()
     {
-        if(quitPanel != null) quitPanel.SetActive(true);
+        if (quitPanel != null) quitPanel.SetActive(true);
     }
 
     public void ConfirmQuitGame()

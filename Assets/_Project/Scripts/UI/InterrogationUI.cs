@@ -60,7 +60,9 @@ public class InterrogationUI : MonoBehaviour
     private void Update()
     {
         // فتح وإغلاق اللوحة عند الضغط على B
-        if (Input.GetKeyDown(KeyCode.B))
+        // B is a keyboard shortcut only; mobile/tablet users use the on-screen button.
+        bool isTouchDevice = UIManager.Instance != null && UIManager.Instance.IsTouchDevice();
+        if (!isTouchDevice && Input.GetKeyDown(KeyCode.B))
         {
             if (interrogationPanel != null)
             {

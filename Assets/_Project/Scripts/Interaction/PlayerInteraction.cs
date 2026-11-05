@@ -6,14 +6,14 @@ public class PlayerInteraction : MonoBehaviour
 {
     [Header("Interaction Settings")]
     [Tooltip("نصف قطر دائرة التفاعل حول اللاعب")]
-    public float interactionRadius = 1.35f;
+    public float interactionRadius = 0.95f;
 
     [Header("Mobile Controls UI")]
     public GameObject mobileInteractBtn;
 
     [Header("Camera Targeting")]
     [Tooltip("يفحص الدليل الموجود أمام الكاميرا حتى لو كان الـ pivot بعيداً عن جسم الدليل")]
-    public float cameraInteractionDistance = 1.55f;
+    public float cameraInteractionDistance = 1.15f;
 
     private IInteractable currentInteractable;
 
@@ -21,8 +21,8 @@ public class PlayerInteraction : MonoBehaviour
     {
         // Keep the hand prompt local to the evidence. This applies to both
         // Case 1 and Case 2 and prevents collecting from across the room.
-        interactionRadius = Mathf.Clamp(interactionRadius, 1.1f, 1.5f);
-        cameraInteractionDistance = Mathf.Clamp(cameraInteractionDistance, 1.25f, 1.7f);
+        interactionRadius = Mathf.Clamp(interactionRadius, 0.75f, 1.05f);
+        cameraInteractionDistance = Mathf.Clamp(cameraInteractionDistance, 0.9f, 1.25f);
 
         // Find the hand button automatically. The button may be inactive in the
         // authored mobile canvas, so GameObject.Find is not sufficient.

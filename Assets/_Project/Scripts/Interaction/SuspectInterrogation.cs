@@ -17,13 +17,21 @@ public class SuspectInterrogation : MonoBehaviour, IInteractable
 
     public bool isAlibiBroken { get; private set; } = false;
 
+    public bool CanInterrogate()
+    {
+        // في الطور الفردي (Solo Mode): تجاوز فوري لشرط الدور وفتح الاستجواب بالكامل
+        if (PlayerPrefs.GetInt("Game_Mode", 1) == 0) return true;
+
+        if (PlayerProfile.LocalPlayer == null) return true;
+        return PlayerProfile.LocalPlayer.currentRole == DetectiveRole.Interrogator ||
+               PlayerProfile.LocalPlayer.currentRole == DetectiveRole.Any;
+    }
+
     public string InteractionPrompt
     {
         get
         {
-            if (PlayerProfile.LocalPlayer != null &&
-                PlayerProfile.LocalPlayer.currentRole != DetectiveRole.Interrogator &&
-                PlayerProfile.LocalPlayer.currentRole != DetectiveRole.Any)
+            if (!CanInterrogate())
             {
                 return "[LOCKED] Requires Interrogator";
             }
@@ -33,9 +41,7 @@ public class SuspectInterrogation : MonoBehaviour, IInteractable
 
     public void Interact()
     {
-        if (PlayerProfile.LocalPlayer != null &&
-            PlayerProfile.LocalPlayer.currentRole != DetectiveRole.Interrogator &&
-            PlayerProfile.LocalPlayer.currentRole != DetectiveRole.Any)
+        if (!CanInterrogate())
         {
             if (UIManager.Instance != null)
                 UIManager.Instance.ShowOnScreenNotification("ACCESS DENIED // REQUIRES INTERROGATOR");
@@ -58,7 +64,11 @@ public class SuspectInterrogation : MonoBehaviour, IInteractable
         // 3. إظهار إشعار حفظ الأقوال
         InterrogationUI.lastInterrogatedSuspect = this;
         
-        if (UIManager.Instance != null)
+        if (UIManager.Instance != null && UIManager.Instance.IsTouchDevice())
+        {
+            UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED // TAP [FILES] TO VIEW DOSSIER");
+        }
+        else if (UIManager.Instance != null)
         {
             UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED // PRESS [B] TO VIEW DOSSIER");
         }

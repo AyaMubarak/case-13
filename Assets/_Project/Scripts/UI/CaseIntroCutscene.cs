@@ -17,12 +17,16 @@ public class CaseIntroCutscene : MonoBehaviour
     [SerializeField] private MonoBehaviour[] scriptsToEnable; // مثل PlayerMovement, CaseBriefingUI
 
     private bool isCutsceneFinished = false;
+    private GameplayMusicController gameplayMusic;
 
     /// <summary>True while the intro plays. Movement, camera look, interaction and evidence collection check this.</summary>
     public static bool IsPlaying { get; private set; }
 
     private void Awake()
     {
+        gameplayMusic = FindAnyObjectByType<GameplayMusicController>(FindObjectsInactive.Include);
+        if (gameplayMusic != null) gameplayMusic.PauseForOverlay();
+
         ResolveRuntimeReferences();
 
         // A Case 1 intro can survive in DontDestroyOnLoad when testing the
@@ -35,6 +39,7 @@ public class CaseIntroCutscene : MonoBehaviour
             if (cutsceneUIPanel != null) cutsceneUIPanel.SetActive(false);
             enabled = false;
             IsPlaying = false;
+            if (gameplayMusic != null) gameplayMusic.ResumeAfterOverlay();
             return;
         }
 
@@ -42,6 +47,7 @@ public class CaseIntroCutscene : MonoBehaviour
         {
             isCutsceneFinished = true;
             IsPlaying = false;
+            if (gameplayMusic != null) gameplayMusic.ResumeAfterOverlay();
             return;
         }
 
@@ -67,7 +73,7 @@ public class CaseIntroCutscene : MonoBehaviour
         if (cutsceneUIPanel == null) cutsceneUIPanel = FindNamedObject("Case2_IntroCanvas", "Case2_IntroPanel", "CutscenePanel");
         if (videoPlayer == null)
         {
-            foreach (VideoPlayer player in FindObjectsByType<VideoPlayer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            foreach (VideoPlayer player in FindObjectsByType<VideoPlayer>(FindObjectsInactive.Include))
             {
                 if (player.gameObject.name.ToLowerInvariant().Contains("intro") || player.gameObject.name.ToLowerInvariant().Contains("video"))
                 {
@@ -82,7 +88,7 @@ public class CaseIntroCutscene : MonoBehaviour
 
     private static GameObject FindNamedObject(params string[] names)
     {
-        foreach (Transform t in FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        foreach (Transform t in FindObjectsByType<Transform>(FindObjectsInactive.Include))
             foreach (string name in names)
                 if (t.name == name) return t.gameObject;
         return null;
@@ -159,6 +165,8 @@ public class CaseIntroCutscene : MonoBehaviour
         if (isCutsceneFinished) return;
         isCutsceneFinished = true;
 
+        if (gameplayMusic != null) gameplayMusic.ResumeAfterOverlay();
+
         if (videoPlayer != null && videoPlayer.isPlaying)
         {
             videoPlayer.Stop();
@@ -173,7 +181,10 @@ public class CaseIntroCutscene : MonoBehaviour
         // Also close any authored/duplicated Case 2 intro roots left by an
         // earlier setup pass. Otherwise the last video frame remains visible
         // above the gameplay HUD after the video ends.
-        string[] introRoots = { "Case2_IntroCanvas", "Case2_IntroPanel", "Case2_IntroVideo" };
+        // Case 02 previously contained two intro implementations.  The old
+        // one used CutscenePanel and could remain as a solid white RawImage
+        // after the active video finished.
+        string[] introRoots = { "Case2_IntroCanvas", "Case2_IntroPanel", "Case2_IntroVideo", "CutscenePanel" };
         foreach (string rootName in introRoots)
         {
             foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
@@ -183,7 +194,7 @@ public class CaseIntroCutscene : MonoBehaviour
             }
         }
 
-        foreach (VideoPlayer player in Object.FindObjectsByType<VideoPlayer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        foreach (VideoPlayer player in Object.FindObjectsByType<VideoPlayer>(FindObjectsInactive.Include))
         {
             string n = player.gameObject.name.ToLowerInvariant();
             if (n.Contains("intro") || n == "case2_introvideoplayer")
@@ -205,6 +216,7 @@ public class CaseIntroCutscene : MonoBehaviour
 
         if (UIManager.Instance != null)
         {
+            UIManager.Instance.StartInvestigationTimer();
             UIManager.Instance.SetMobileControlsActive(true);
             if (UIManager.Instance.inGameHUD != null) UIManager.Instance.inGameHUD.SetActive(true);
         }
@@ -225,15 +237,34 @@ public class CaseIntroCutscene : MonoBehaviour
 
     private void ResolveSkipButton()
     {
-        if (skipButton == null && cutsceneUIPanel != null)
+        if (cutsceneUIPanel != null)
         {
             Button[] buttons = cutsceneUIPanel.GetComponentsInChildren<Button>(true);
             foreach (Button button in buttons)
             {
                 if (button.name.ToLowerInvariant().Contains("skip"))
                 {
-                    skipButton = button;
-                    break;
+                    if (skipButton == null)
+                    {
+                        skipButton = button;
+                    }
+                    else if (skipButton != button)
+                    {
+                        // Hide duplicate skip buttons in the scene
+                        button.gameObject.SetActive(false);
+                    }
+                }
+            }
+        }
+
+        // Also search globally in the scene to suppress any other rogue skip buttons
+        foreach (Button b in FindObjectsByType<Button>(FindObjectsInactive.Include))
+        {
+            if (b != null && b.name.ToLowerInvariant().Contains("skip") && b != skipButton)
+            {
+                if (b.transform.IsChildOf(transform) || (cutsceneUIPanel != null && b.transform.IsChildOf(cutsceneUIPanel.transform)))
+                {
+                    b.gameObject.SetActive(false);
                 }
             }
         }

@@ -68,7 +68,7 @@ public class GuiltySelectionBoard : MonoBehaviour
         else
         {
             Debug.Log("<color=red>WRONG SUSPECT!</color> Investigation Failed!");
-            
+
             if (UIManager.Instance != null)
             {
                 UIManager.Instance.ShowOnScreenNotification("WRONG SUSPECT! INVESTIGATION FAILED.");

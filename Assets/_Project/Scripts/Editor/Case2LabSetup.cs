@@ -1111,6 +1111,17 @@ public class Case2LabSetup : EditorWindow
         col.center = new Vector3(0, height * 0.5f, 0);
         col.radius = 0.38f;
 
+        // 5b. Ensure NavMeshAgent is present and configured
+        UnityEngine.AI.NavMeshAgent agent = rootGO.GetComponent<UnityEngine.AI.NavMeshAgent>();
+        if (agent == null) agent = rootGO.AddComponent<UnityEngine.AI.NavMeshAgent>();
+        agent.speed = 1.8f;
+        agent.angularSpeed = 240f;
+        agent.acceleration = 8f;
+        agent.stoppingDistance = 0.5f;
+        agent.baseOffset = 0f;
+        agent.radius = 0.35f;
+        agent.height = height;
+
         // 6. Update SuspectInterrogation
         SuspectInterrogation si = rootGO.GetComponent<SuspectInterrogation>();
         if (si != null)
@@ -1311,10 +1322,10 @@ public class Case2LabSetup : EditorWindow
                 if (eliminatesSuspect != null) ev.eliminatesSuspectID = eliminatesSuspect;
                 if (finding != null) ev.eliminationFinding = finding;
 
-                // Clean out any broken/empty MeshCollider
+                // Clean out all problematic MeshColliders on evidence items (use clean SphereCollider trigger instead)
                 foreach (var mc in ev.GetComponentsInChildren<MeshCollider>(true))
                 {
-                    if (mc != null && mc.sharedMesh == null)
+                    if (mc != null)
                     {
                         Undo.DestroyObjectImmediate(mc);
                     }

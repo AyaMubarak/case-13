@@ -26,7 +26,7 @@ public class CharacterSelectManager : MonoBehaviour
     [SerializeField] private GameObject mainMenuButtons; // لوحة أزرار القائمة الرئيسية لإعادتها عند الرجوع
 
     // المتغيرات المحفوظة
-    public static string SelectedName { get; private set; } = "Detective";
+    public static string SelectedName { get; private set; } = "";
     public static string SelectedGender { get; private set; } = "Male";
     public static string SelectedRole { get; private set; } = "Field Detective";
 
@@ -85,7 +85,7 @@ public class CharacterSelectManager : MonoBehaviour
 
     private void LoadSavedIdentity()
     {
-        SelectedName = PlayerPrefs.GetString("Player_Name", SelectedName);
+        SelectedName = PlayerPrefs.GetString("Player_Name", "");
         SelectedGender = PlayerPrefs.GetString("Player_Gender", SelectedGender);
         SelectedRole = PlayerPrefs.GetString("Player_Role", SelectedRole);
     }
@@ -211,10 +211,19 @@ public class CharacterSelectManager : MonoBehaviour
     // --- زر التأكيد (Confirm & Start) ---
     public void OnConfirmAndStart()
     {
-        if (nameInputField != null && !string.IsNullOrWhiteSpace(nameInputField.text))
+        string enteredName = nameInputField != null ? nameInputField.text.Trim() : SelectedName.Trim();
+        if (string.IsNullOrWhiteSpace(enteredName))
         {
-            SelectedName = nameInputField.text.Trim();
+            ShowNameAlert("NAME REQUIRED // ENTER A UNIQUE NAME FIRST");
+            if (nameInputField != null) nameInputField.Select();
+            return;
         }
+        if (enteredName.Length < 2)
+        {
+            ShowNameAlert("NAME TOO SHORT // USE AT LEAST 2 CHARACTERS");
+            return;
+        }
+        SelectedName = enteredName;
 
         SaveIdentity();
 
@@ -226,6 +235,28 @@ public class CharacterSelectManager : MonoBehaviour
         {
             lobbyPanel.SetActive(true);
         }
+    }
+
+    private void ShowNameAlert(string message)
+    {
+        TMP_Text alert = transform.Find("NameValidationAlert")?.GetComponent<TMP_Text>();
+        if (alert == null)
+        {
+            GameObject alertObject = new GameObject("NameValidationAlert", typeof(RectTransform), typeof(TextMeshProUGUI));
+            alertObject.transform.SetParent(transform, false);
+            RectTransform rect = alertObject.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.12f, 0.54f);
+            rect.anchorMax = new Vector2(0.35f, 0.60f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            alert = alertObject.GetComponent<TextMeshProUGUI>();
+            alert.alignment = TextAlignmentOptions.Center;
+            alert.fontSize = 18f;
+            alert.textWrappingMode = TextWrappingModes.Normal;
+        }
+        alert.text = message;
+        alert.color = new Color(1f, 0.32f, 0.28f, 1f);
+        alert.gameObject.SetActive(true);
     }
 
     // --- زر الرجوع (Back) ---

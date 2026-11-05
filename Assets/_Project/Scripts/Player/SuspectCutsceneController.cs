@@ -4,10 +4,14 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
+using Photon.Pun;
+using Photon.Realtime;
+using ExitGames.Client.Photon;
 
-public class SeparateInterrogationManager : MonoBehaviour
+public class SeparateInterrogationManager : MonoBehaviour, IOnEventCallback
 {
     public static SeparateInterrogationManager Instance { get; private set; }
+    public bool AreBothSuspectsCompleted { get; private set; } = false;
 
     private static readonly int IsWalking = Animator.StringToHash("isWalking");
     private static readonly int Speed = Animator.StringToHash("Speed");
@@ -16,6 +20,11 @@ public class SeparateInterrogationManager : MonoBehaviour
     private static readonly int SittingState = Animator.StringToHash("Base Layer.sitting");
     private const string VictorPortraitResourcePath = "Portraits/Victor_Sterling";
     private const string ElenaPortraitResourcePath = "Portraits/Elena_Rostova";
+
+    // أكواد المزامنة عبر شبكة الفوتون لطور اللعب الجماعي
+    public const byte InterrogationStartEventCode = 85;
+    public const byte InterrogationDialogueEventCode = 86;
+    public const byte InterrogationAnimEventCode = 87;
 
     [System.Serializable]
     public class SuspectData
@@ -70,11 +79,11 @@ public class SeparateInterrogationManager : MonoBehaviour
     [Tooltip("إخفاء المتهمين في البداية حتى يتم جمع كافة الأدلة الـ 5 كاملة مثل كيس 1")]
     public bool keepSuspectsVisibleInitially = false;
 
-    // الإحداثيات الدقيقة للكرسي الافتراضي ومحاذاة الجلوس
-    // Exact Case 1 sitting pose from the authored suspect placement. Case 2
-    // keeps using its own authored ChairTarget and is not changed by this.
-    private readonly Vector3 chairSeatPosition = new Vector3(1.946f, 0f, -7.78306f);
-    private readonly Quaternion chairSeatRotation = Quaternion.Euler(5.391f, -222.89f, 6.13f);
+    // الإحداثيات والزوايا الدقيقة المطلوبة في Inspector لجلوس المتهمين (إيفان ونورا) في Case 1:
+    // Position: X: 1.88, Y: 0, Z: -7.835
+    // Rotation: X: 0.614, Y: -211.415, Z: 3.736
+    private readonly Vector3 chairSeatPosition = new Vector3(1.88f, 0f, -7.835f);
+    private readonly Quaternion chairSeatRotation = Quaternion.Euler(0.614f, -211.415f, 3.736f);
     private Transform case2ManualChair;
     private Vector3 case2ManualChairLocalPosition;
     private Quaternion case2ManualChairLocalRotation;
@@ -88,6 +97,16 @@ public class SeparateInterrogationManager : MonoBehaviour
     private bool isInterrogating = false;
     private readonly List<AudioSource> mutedBackgroundSources = new List<AudioSource>();
     private readonly List<bool> previousMuteStates = new List<bool>();
+
+    private void OnEnable()
+    {
+        PhotonNetwork.AddCallbackTarget(this);
+    }
+
+    private void OnDisable()
+    {
+        PhotonNetwork.RemoveCallbackTarget(this);
+    }
 
     void Awake()
     {
@@ -447,6 +466,17 @@ public class SeparateInterrogationManager : MonoBehaviour
             }
 
             suspect.agent = suspect.suspectObject.GetComponent<NavMeshAgent>();
+            if (suspect.agent == null)
+            {
+                suspect.agent = suspect.suspectObject.gameObject.AddComponent<NavMeshAgent>();
+                suspect.agent.speed = 1.8f;
+                suspect.agent.angularSpeed = 240f;
+                suspect.agent.acceleration = 8f;
+                suspect.agent.stoppingDistance = 0.5f;
+                suspect.agent.baseOffset = 0f;
+                suspect.agent.radius = 0.35f;
+                suspect.agent.height = 1.8f;
+            }
             suspect.animator = suspect.suspectObject.GetComponentInChildren<Animator>();
             suspect.suspectCollider = suspect.suspectObject.GetComponent<Collider>();
             suspect.initialPosition = suspect.suspectObject.position;
@@ -522,9 +552,17 @@ public class SeparateInterrogationManager : MonoBehaviour
         suspect.isWaitingForInteraction = true;
     }
 
-    public void StartInterrogationSequence()
+    public void StartInterrogationSequence(bool broadcastNetwork = true)
     {
         if (isInterrogating) return;
+
+        if (broadcastNetwork && PhotonNetwork.InRoom)
+        {
+            // بث بدء الاستجواب لكافة اللاعبين في الجلسة لتوحيد التجربة
+            object[] data = new object[] { currentSuspectTurn };
+            PhotonNetwork.RaiseEvent(InterrogationStartEventCode, data,
+                new RaiseEventOptions { Receivers = ReceiverGroup.Others }, SendOptions.SendReliable);
+        }
 
         SuspectData target = (currentSuspectTurn == 1) ? suspect1 : suspect2;
 
@@ -749,8 +787,22 @@ public class SeparateInterrogationManager : MonoBehaviour
     {
         if (suspect == null || suspect.suspectObject == null) return;
 
-        Vector3 seatPosition = suspect.chairTarget != null ? suspect.chairTarget.position : chairSeatPosition;
-        Quaternion seatRotation = suspect.chairTarget != null ? suspect.chairTarget.rotation : chairSeatRotation;
+        bool isCase1 = !UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02");
+        Vector3 seatPosition;
+        Quaternion seatRotation;
+
+        if (isCase1)
+        {
+            // في القضية الأولى: تطبيق الإحداثيات والزوايا المصححة مباشرة لمنع التداخل وتوجيه المتهم نحو الطاولة والمحقق
+            seatPosition = chairSeatPosition;
+            seatRotation = chairSeatRotation;
+        }
+        else
+        {
+            seatPosition = suspect.chairTarget != null ? suspect.chairTarget.position : chairSeatPosition;
+            seatRotation = suspect.chairTarget != null ? suspect.chairTarget.rotation : chairSeatRotation;
+        }
+
         seatPosition.y = 0f;
         suspect.suspectObject.position = seatPosition;
         suspect.suspectObject.rotation = seatRotation;
@@ -910,6 +962,7 @@ public class SeparateInterrogationManager : MonoBehaviour
         {
             UIManager.Instance.ShowOnScreenNotification($"[DETECTIVE]: {detText}", detectiveDuration);
         }
+        BroadcastDialogue("[DETECTIVE]", detText, detectiveDuration);
 
         if (detectiveVoice != null && detectiveVoice.clip != null)
         {
@@ -929,6 +982,7 @@ public class SeparateInterrogationManager : MonoBehaviour
         {
             suspect.animator.ResetTrigger("StopTalking");
             suspect.animator.SetTrigger("StartTalking");
+            BroadcastSuspectAnim(currentSuspectTurn, "StartTalking");
         }
 
         string susName = !string.IsNullOrEmpty(suspect.suspectName) ? suspect.suspectName.ToUpper() : "SUSPECT";
@@ -939,6 +993,7 @@ public class SeparateInterrogationManager : MonoBehaviour
         {
             UIManager.Instance.ShowOnScreenNotification($"[{susName}]: {susText}", suspectDuration);
         }
+        BroadcastDialogue($"[{susName}]", susText, suspectDuration);
 
         if (suspect.suspectVoiceAudio != null && suspect.suspectVoiceAudio.clip != null)
         {
@@ -958,6 +1013,7 @@ public class SeparateInterrogationManager : MonoBehaviour
         {
             suspect.animator.ResetTrigger("StartTalking");
             suspect.animator.SetTrigger("StopTalking");
+            BroadcastSuspectAnim(currentSuspectTurn, "StopTalking");
         }
 
         yield return new WaitForSeconds(0.5f);
@@ -969,17 +1025,19 @@ public class SeparateInterrogationManager : MonoBehaviour
             InterrogationUI.Instance.SetInterrogationRecord(suspect.suspectName, suspect.suspectDialogueText, suspect.suspectPortrait);
         }
 
-        if (UIManager.Instance != null)
+        if (currentSuspectTurn == 2)
         {
-            UIManager.Instance.UnlockDossierAccess();
-            
-            if (Application.isMobilePlatform || SystemInfo.deviceType == DeviceType.Handheld || UIManager.Instance.forceMobileUIInEditor)
+            // The dossier is unlocked only after MakeSuspectLeave marks both
+            // suspects as completed. Do not expose it while this dialogue is
+            // still finishing or while the first suspect is being handled.
+            if (UIManager.Instance != null)
+                UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED // FINISH BOTH SUSPECT INTERROGATIONS TO UNLOCK DOSSIER", 4.0f);
+        }
+        else
+        {
+            if (UIManager.Instance != null)
             {
-                UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED! TAP [FILES] TO REVIEW CASE");
-            }
-            else
-            {
-                UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED! PRESS [B] TO REVIEW CASE FILES");
+                UIManager.Instance.ShowOnScreenNotification("STATEMENT RECORDED // INTERROGATE NEXT SUSPECT TO UNLOCK DOSSIER", 4.0f);
             }
         }
 
@@ -1044,6 +1102,12 @@ public class SeparateInterrogationManager : MonoBehaviour
 
     public void OpenLogPanel()
     {
+        if (!AreBothSuspectsCompleted)
+        {
+            Debug.Log("[INTERROGATION] Dossier blocked until both suspect interrogations are complete.");
+            return;
+        }
+
         if (interrogationLogPanel != null)
         {
             Canvas rootCanvas = interrogationLogPanel.GetComponentInParent<Canvas>(true);
@@ -1495,7 +1559,15 @@ public class SeparateInterrogationManager : MonoBehaviour
         }
         else if (currentSuspectTurn == 2)
         {
-            // عند انتهاء استجواب المتهم الثاني، تظهر أيقونة الأقوال مكان زر الملفات
+            AreBothSuspectsCompleted = true;
+            if (CaseDossierManager.Instance != null)
+            {
+                CaseDossierManager.Instance.UnlockDossierAfterInterrogation();
+            }
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.UnlockDossierAccess();
+            }
             ShowTranscriptsButtonAtFilesPosition();
             OpenLogPanel();
         }
@@ -1571,6 +1643,83 @@ public class SeparateInterrogationManager : MonoBehaviour
                 currentSuspectTurn = 1;
             }
         }
-        StartInterrogationSequence();
+        StartInterrogationSequence(true);
+    }
+
+    // --- مزامنة شبكة الفوتون للحوارات والأنيميشن عبر الإنترنت ---
+
+    private void BroadcastDialogue(string speaker, string text, float duration)
+    {
+        if (!PhotonNetwork.InRoom) return;
+
+        object[] payload = new object[] { speaker, text, duration };
+        PhotonNetwork.RaiseEvent(InterrogationDialogueEventCode, payload,
+            new RaiseEventOptions { Receivers = ReceiverGroup.Others }, SendOptions.SendReliable);
+    }
+
+    private void BroadcastSuspectAnim(int suspectIndex, string triggerName)
+    {
+        if (!PhotonNetwork.InRoom) return;
+
+        object[] payload = new object[] { suspectIndex, triggerName };
+        PhotonNetwork.RaiseEvent(InterrogationAnimEventCode, payload,
+            new RaiseEventOptions { Receivers = ReceiverGroup.Others }, SendOptions.SendReliable);
+    }
+
+    public void OnEvent(EventData photonEvent)
+    {
+        if (!PhotonNetwork.InRoom) return;
+
+        // 1. مزامنة بدء الاستجواب
+        if (photonEvent.Code == InterrogationStartEventCode)
+        {
+            if (photonEvent.CustomData is object[] data && data.Length > 0)
+            {
+                currentSuspectTurn = (int)data[0];
+                Debug.Log($"<color=cyan>[PUN SYNC] Received Interrogation Start for Turn {currentSuspectTurn}</color>");
+                StartInterrogationSequence(false); // تشغيل محلي بدون إعادة بث
+            }
+        }
+        // 2. مزامنة نصوص وأقوال الحوار (Shared Subtitles)
+        else if (photonEvent.Code == InterrogationDialogueEventCode)
+        {
+            if (photonEvent.CustomData is object[] data && data.Length >= 3)
+            {
+                string speaker = data[0] as string;
+                string text = data[1] as string;
+                float duration = (float)data[2];
+
+                if (UIManager.Instance != null)
+                {
+                    UIManager.Instance.ShowOnScreenNotification($"{speaker}: {text}", duration);
+                }
+                Debug.Log($"<color=yellow>[PUN SYNC DIALOGUE]</color> {speaker}: {text}");
+            }
+        }
+        // 3. مزامنة حركات المتهم وتعبيرات اليدين والحديث (Animation Sync)
+        else if (photonEvent.Code == InterrogationAnimEventCode)
+        {
+            if (photonEvent.CustomData is object[] data && data.Length >= 2)
+            {
+                int sIndex = (int)data[0];
+                string trigger = data[1] as string;
+
+                SuspectData sTarget = (sIndex == 1) ? suspect1 : suspect2;
+                if (sTarget != null && sTarget.animator != null)
+                {
+                    if (trigger == "StartTalking")
+                    {
+                        sTarget.animator.ResetTrigger("StopTalking");
+                        sTarget.animator.SetTrigger("StartTalking");
+                    }
+                    else if (trigger == "StopTalking")
+                    {
+                        sTarget.animator.ResetTrigger("StartTalking");
+                        sTarget.animator.SetTrigger("StopTalking");
+                    }
+                }
+                Debug.Log($"<color=green>[PUN SYNC ANIM]</color> Triggered {trigger} on Suspect {sIndex}");
+            }
+        }
     }
 }

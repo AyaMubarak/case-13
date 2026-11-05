@@ -4,10 +4,13 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
 public class UIManager : MonoBehaviour
 {
     public static UIManager Instance { get; private set; }
+    private const string Case2ReadyProperty = "ReadyForCase2";
+    private bool case2TransitionStarted;
 
     [Header("HUD Elements")]
     public TextMeshProUGUI interactionPromptText;
@@ -48,6 +51,11 @@ public class UIManager : MonoBehaviour
     public GameObject settingsPanel;
 
     private float gameStartTime;
+    private static float sessionStartTime = -1f;
+    private bool investigationTimerStarted;
+    private bool finalEndingVideoPlayed;
+    private GameObject finalEndingPanel;
+    private float capturedInvestigationTime = -1f;
     private bool isGameActive = true;
 
     private bool isInventoryOpen = false;
@@ -56,7 +64,7 @@ public class UIManager : MonoBehaviour
     [Header("Mobile Testing")]
     public bool forceMobileUIInEditor = true; // ضع عليها صح في الـ Inspector لاختبار الجوال
 
-    private bool IsTouchDevice()
+    public bool IsTouchDevice()
     {
 #if UNITY_EDITOR
         return forceMobileUIInEditor;
@@ -138,7 +146,17 @@ public class UIManager : MonoBehaviour
             notificationBannerText.transform.parent.gameObject.SetActive(false);
         }
 
-        gameStartTime = Time.time;
+        bool isFirstCase = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case01");
+        ScoreManager.EnsureInstance();
+        if (isFirstCase)
+        {
+            ScoreManager.Instance.ResetScore();
+            sessionStartTime = -1f;
+        }
+
+        investigationTimerStarted = sessionStartTime >= 0f;
+        if (investigationTimerStarted)
+            gameStartTime = sessionStartTime;
         isGameActive = true;
 
         if (endGamePanel != null) endGamePanel.SetActive(false);
@@ -275,6 +293,7 @@ public class UIManager : MonoBehaviour
             {
                 mobileDossierBtn.transform.SetParent(hudContainer, false);
             }
+            // The suspect dossier icon is always available beside the bag.
             mobileDossierBtn.SetActive(true);
             mobileDossierBtn.transform.SetAsLastSibling();
 
@@ -366,6 +385,7 @@ public class UIManager : MonoBehaviour
 
     private void Update()
     {
+        CheckCoopCase2Transition();
         // إخفاء فوري وتام لأزرار الحقيبة والملفات أثناء تشغيل أي فيديو أو كاتسين سينمائي
         bool isCutsceneOrVideo = CaseIntroCutscene.IsPlaying || EvidenceCutsceneManager.IsQuizOrVideoActive;
         if (isCutsceneOrVideo)
@@ -399,7 +419,17 @@ public class UIManager : MonoBehaviour
     // فتح وإغلاق ملف التحقيق الصحيح
     public void ToggleInterrogationDossier()
     {
-        if (!isGameActive) return; // منع الفتح إذا انتهت اللعبة
+        if (!isGameActive) return;
+
+        // The icon is always visible, but the dossier panel is unavailable
+        // until Victor and Elena have both completed their interrogations.
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02") &&
+            (SeparateInterrogationManager.Instance == null ||
+             !SeparateInterrogationManager.Instance.AreBothSuspectsCompleted))
+        {
+            ShowOnScreenNotification("CASE DOSSIER LOCKED // COMPLETE BOTH INTERROGATIONS FIRST", 3.5f);
+            return;
+        }
 
         // إغلاق الحقيبة إن كانت مفتوحة لمنع التداخل
         if (isInventoryOpen)
@@ -437,8 +467,13 @@ public class UIManager : MonoBehaviour
     }
 
     // دالة لاستدعائها من زر الموبايل لفتح/إغلاق ملف التحقيق
+    private float lastDossierClickTime;
+
     public void OnMobileDossierButtonClicked()
     {
+        if (Time.unscaledTime - lastDossierClickTime < 0.25f) return;
+        lastDossierClickTime = Time.unscaledTime;
+
         Debug.Log("<color=cyan>[UI] Dossier Button Clicked via Mobile UI!</color>");
         if (CaseDossierManager.Instance == null)
         {
@@ -457,6 +492,11 @@ public class UIManager : MonoBehaviour
         if (mobileDossierBtn == null) return;
 
         mobileDossierBtn.SetActive(true);
+        
+        // التأكد من أن الصورة تستقبل اللمس
+        Image img = mobileDossierBtn.GetComponent<Image>();
+        if (img != null) img.raycastTarget = true;
+
         Button button = mobileDossierBtn.GetComponent<Button>();
         if (button == null) button = mobileDossierBtn.AddComponent<Button>();
         button.onClick.RemoveAllListeners();
@@ -464,9 +504,12 @@ public class UIManager : MonoBehaviour
 
         var trigger = mobileDossierBtn.GetComponent<UnityEngine.EventSystems.EventTrigger>();
         if (trigger == null) trigger = mobileDossierBtn.AddComponent<UnityEngine.EventSystems.EventTrigger>();
-        // The Button listener above is the single click path. Keeping an
-        // additional PointerClick callback would toggle the dossier twice.
         trigger.triggers.Clear();
+        
+        var entry = new UnityEngine.EventSystems.EventTrigger.Entry();
+        entry.eventID = UnityEngine.EventSystems.EventTriggerType.PointerDown;
+        entry.callback.AddListener((data) => { OnMobileDossierButtonClicked(); });
+        trigger.triggers.Add(entry);
     }
 
     public void ToggleInventory()
@@ -1024,6 +1067,9 @@ public class UIManager : MonoBehaviour
     public void ShowEndGameScreen()
     {
         isGameActive = false;
+
+        if (capturedInvestigationTime < 0f && investigationTimerStarted)
+            capturedInvestigationTime = Mathf.Max(0f, Time.unscaledTime - gameStartTime);
         
         // إخفاء الـ HUD المعتاد
         if (inGameHUD != null) inGameHUD.SetActive(false);
@@ -1033,6 +1079,17 @@ public class UIManager : MonoBehaviour
         if (inventoryPanel != null) inventoryPanel.SetActive(false);
         if (interrogationBoardPanel != null) interrogationBoardPanel.SetActive(false);
         if (CaseDossierManager.Instance != null) CaseDossierManager.Instance.CloseDossier();
+
+        if (!finalEndingVideoPlayed &&
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02"))
+        {
+            VideoClip endingClip = Resources.Load<VideoClip>("FinalCaseEnding");
+            if (endingClip != null)
+            {
+                StartCoroutine(PlayFinalEndingVideo(endingClip));
+                return;
+            }
+        }
 
         // إنشاء أو تجهيز لوحة النهاية بتصميم فخم ومستقل برمجياً إن لم تكن مربوطة في الـ Inspector
         EnsureEndGamePanelCreated();
@@ -1048,51 +1105,141 @@ public class UIManager : MonoBehaviour
         Cursor.visible = true;
 
         // حساب الوقت والنقاط والرتبة
-        float timeSpent = Time.time - gameStartTime;
+        if (!investigationTimerStarted)
+            StartInvestigationTimer();
+
+        float timeSpent = capturedInvestigationTime >= 0f
+            ? capturedInvestigationTime
+            : Mathf.Max(0f, Time.unscaledTime - gameStartTime);
         int minutes = Mathf.FloorToInt(timeSpent / 60);
         int seconds = Mathf.FloorToInt(timeSpent % 60);
 
         int evCount = EvidenceManager.Instance != null ? EvidenceManager.Instance.CollectedCount : 5;
 
+        int totalScore = 500;
+        int totalMistakes = 0;
         string rankBadge = "S";
         string rankTitle = "MASTER DETECTIVE";
-        string rankColor = "#FFD700"; // Gold
+        string rankColor = "#FFD700";
+        string mistakeBreakdown = "<color=#00E676>PERFECT RECORD // NO ERRORS DETECTED</color>";
 
-        if (evCount >= 5 && timeSpent <= 360)
+        if (ScoreManager.Instance != null)
         {
-            rankBadge = "S";
-            rankTitle = "MASTER DETECTIVE";
-            rankColor = "#FFD700";
-        }
-        else if (evCount >= 4)
-        {
-            rankBadge = "A";
-            rankTitle = "SENIOR INVESTIGATOR";
-            rankColor = "#00E5FF";
-        }
-        else if (evCount >= 2)
-        {
-            rankBadge = "B";
-            rankTitle = "FIELD AGENT";
-            rankColor = "#69F0AE";
+            totalScore = ScoreManager.Instance.CurrentScore;
+            totalMistakes = ScoreManager.Instance.TotalMistakesCount;
+            rankBadge = ScoreManager.Instance.GetCurrentRankBadge(out rankTitle, out rankColor);
+
+            if (Photon.Pun.PhotonNetwork.InRoom)
+            {
+                ScoreManager.GetCoopTotals(out totalScore, out totalMistakes);
+                rankBadge = GetRankForScore(totalScore, totalMistakes, out rankTitle, out rankColor);
+            }
+
+            if (ScoreManager.Instance.MistakeLogs != null && ScoreManager.Instance.MistakeLogs.Count > 0)
+            {
+                mistakeBreakdown = "<color=#FF5252><b>CASE INQUIRY ERRORS & PENALTIES:</b></color>\n" + string.Join("\n", ScoreManager.Instance.MistakeLogs);
+            }
         }
         else
         {
-            rankBadge = "C";
-            rankTitle = "ROOKIE OFFICER";
-            rankColor = "#B0BEC5";
+            totalScore = Mathf.Max(0, 500 - (totalMistakes * 75));
         }
-
-        int totalScore = ScoreManager.Instance != null ? ScoreManager.Instance.CurrentScore : (evCount * 20);
 
         if (timeTakenText != null) 
             timeTakenText.text = $"<color=#78909C>INVESTIGATION TIME</color>\n<size=125%><color=#ECEFF1><b>{minutes:00}:{seconds:00}</b></size></color>";
 
         if (evidenceScoreText != null) 
-            evidenceScoreText.text = $"<color=#78909C>EVIDENCE & SCORE</color>\n<size=120%><color=#ECEFF1><b>{evCount} / 5 CLUES</b></color></size>\n<size=90%><color=#FFD54F><b>SCORE: {totalScore} PTS</b></color></size>";
+            evidenceScoreText.text = $"<color=#78909C>SCORE & MISTAKES</color>\n<size=120%><color=#ECEFF1><b>{totalScore} PTS</b></color></size>\n<size=90%><color=#FF8A80><b>ERRORS: {totalMistakes}</b></color></size>";
 
         if (finalGradeText != null) 
-            finalGradeText.text = $"<color=#78909C>FINAL EVALUATION</color>\n<size=150%><color={rankColor}><b>RANK {rankBadge}</b></color></size>\n<size=80%><color=#CFD8DC>[{rankTitle}]</color></size>";
+            finalGradeText.text = $"<color=#78909C>FINAL EVALUATION</color>\n<size=140%><color={rankColor}><b>RANK {rankBadge}</b></color></size>\n<size=75%><color=#CFD8DC>[{rankTitle}]</color></size>\n<size=65%>{mistakeBreakdown}</size>";
+    }
+
+    private static string GetRankForScore(int score, int mistakes, out string title, out string color)
+    {
+        if (score >= 450 && mistakes == 0)
+        {
+            title = "MASTER DETECTIVE (FLAWLESS)"; color = "#FFD700"; return "S";
+        }
+        if (score >= 350 && mistakes <= 2)
+        {
+            title = "SENIOR INVESTIGATOR"; color = "#00E5FF"; return "A";
+        }
+        if (score >= 200 && mistakes <= 4)
+        {
+            title = "FIELD AGENT"; color = "#69F0AE"; return "B";
+        }
+        title = "ROOKIE OFFICER"; color = "#B0BEC5"; return "C";
+    }
+
+    private IEnumerator PlayFinalEndingVideo(VideoClip clip)
+    {
+        finalEndingVideoPlayed = true;
+
+        Canvas canvas = GetMainCanvas();
+        if (canvas == null)
+        {
+            ShowEndGameScreen();
+            yield break;
+        }
+
+        finalEndingPanel = new GameObject("FinalCaseEndingVideo", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        finalEndingPanel.transform.SetParent(canvas.transform, false);
+        finalEndingPanel.transform.SetAsLastSibling();
+        RectTransform panelRect = finalEndingPanel.GetComponent<RectTransform>();
+        panelRect.anchorMin = Vector2.zero;
+        panelRect.anchorMax = Vector2.one;
+        panelRect.offsetMin = Vector2.zero;
+        panelRect.offsetMax = Vector2.zero;
+        finalEndingPanel.GetComponent<Image>().color = Color.black;
+
+        GameObject videoObject = new GameObject("FinalCaseEndingPlayer", typeof(VideoPlayer));
+        videoObject.transform.SetParent(finalEndingPanel.transform, false);
+        RawImage display = new GameObject("FinalCaseEndingDisplay", typeof(RectTransform), typeof(CanvasRenderer), typeof(RawImage))
+            .GetComponent<RawImage>();
+        display.transform.SetParent(finalEndingPanel.transform, false);
+        RectTransform displayRect = display.rectTransform;
+        displayRect.anchorMin = Vector2.zero;
+        displayRect.anchorMax = Vector2.one;
+        displayRect.offsetMin = Vector2.zero;
+        displayRect.offsetMax = Vector2.zero;
+
+        RenderTexture renderTexture = new RenderTexture(1920, 1080, 0);
+        VideoPlayer player = videoObject.GetComponent<VideoPlayer>();
+        player.playOnAwake = false;
+        player.isLooping = false;
+        player.renderMode = VideoRenderMode.RenderTexture;
+        player.targetTexture = renderTexture;
+        player.clip = clip;
+        display.texture = renderTexture;
+
+        player.Prepare();
+        float prepareTimeout = Time.realtimeSinceStartup + 8f;
+        while (!player.isPrepared && Time.realtimeSinceStartup < prepareTimeout)
+            yield return null;
+
+        if (player.isPrepared)
+        {
+            player.Play();
+            while (player.isPlaying)
+                yield return null;
+        }
+
+        player.Stop();
+        Destroy(renderTexture);
+        Destroy(finalEndingPanel);
+        finalEndingPanel = null;
+        ShowEndGameScreen();
+    }
+
+    public void StartInvestigationTimer()
+    {
+        if (sessionStartTime < 0f)
+            sessionStartTime = Time.unscaledTime;
+
+        if (investigationTimerStarted) return;
+        gameStartTime = sessionStartTime;
+        investigationTimerStarted = true;
     }
 
     private void EnsureEndGamePanelCreated()
@@ -1106,7 +1253,7 @@ public class UIManager : MonoBehaviour
         Canvas mainCanvas = GetMainCanvas();
         if (mainCanvas == null) return;
 
-        // 1. إنشاء الحاوية الرئيسية لخلفية شاشة النهاية
+        // 1. الحاوية الرئيسية للشاشة بالكامل تغطي 100% مع حجب الإدخال
         endGamePanel = new GameObject("EndGamePanel_Polished", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         endGamePanel.transform.SetParent(mainCanvas.transform, false);
 
@@ -1125,36 +1272,46 @@ public class UIManager : MonoBehaviour
         panelRt.offsetMax = Vector2.zero;
 
         Image panelImg = endGamePanel.GetComponent<Image>();
-        panelImg.color = new Color(0.02f, 0.04f, 0.07f, 0.97f);
+        panelImg.color = new Color(0.02f, 0.04f, 0.07f, 0.98f); // كحلي داكن نوار مثل شاشات اللوبي
 
-        // 2. بطاقة التقرير المركزية الفخمة (Card Modal)
+        // 2. بطاقة التقرير المركزية الفخمة تغطي الشاشة بشكل استجابي ومرتب متناسق مع الموبايل والتابلت
         GameObject card = new GameObject("EvaluationCard", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         card.transform.SetParent(endGamePanel.transform, false);
 
         RectTransform cardRt = card.GetComponent<RectTransform>();
-        cardRt.anchorMin = new Vector2(0.5f, 0.5f);
-        cardRt.anchorMax = new Vector2(0.5f, 0.5f);
+        cardRt.anchorMin = new Vector2(0.04f, 0.04f);
+        cardRt.anchorMax = new Vector2(0.96f, 0.96f);
+        cardRt.offsetMin = Vector2.zero;
+        cardRt.offsetMax = Vector2.zero;
         cardRt.pivot = new Vector2(0.5f, 0.5f);
-        cardRt.sizeDelta = new Vector2(820f, 480f);
-        cardRt.anchoredPosition = Vector2.zero;
 
         Image cardImg = card.GetComponent<Image>();
-        cardImg.color = new Color(0.06f, 0.09f, 0.14f, 0.98f);
+        cardImg.color = new Color(0.06f, 0.09f, 0.14f, 0.96f);
+
+        // إطار علوي نيون مميز يطابق ديزاين شاشات اللوبي
+        GameObject topBar = new GameObject("TopBorder", typeof(RectTransform), typeof(Image));
+        topBar.transform.SetParent(card.transform, false);
+        RectTransform barRt = topBar.GetComponent<RectTransform>();
+        barRt.anchorMin = new Vector2(0f, 1f);
+        barRt.anchorMax = new Vector2(1f, 1f);
+        barRt.pivot = new Vector2(0.5f, 1f);
+        barRt.sizeDelta = new Vector2(0f, 6f);
+        topBar.GetComponent<Image>().color = new Color(0.0f, 0.9f, 1.0f, 1f);
 
         // 3. شريط العنوان العلوي (Header Title)
         GameObject headerObj = new GameObject("HeaderTitle", typeof(RectTransform), typeof(TextMeshProUGUI));
         headerObj.transform.SetParent(card.transform, false);
         RectTransform headerRt = headerObj.GetComponent<RectTransform>();
-        headerRt.anchorMin = new Vector2(0.5f, 1f);
-        headerRt.anchorMax = new Vector2(0.5f, 1f);
+        headerRt.anchorMin = new Vector2(0.03f, 0.84f);
+        headerRt.anchorMax = new Vector2(0.97f, 0.98f);
+        headerRt.offsetMin = Vector2.zero;
+        headerRt.offsetMax = Vector2.zero;
         headerRt.pivot = new Vector2(0.5f, 1f);
-        headerRt.sizeDelta = new Vector2(750f, 70f);
-        headerRt.anchoredPosition = new Vector2(0f, -25f);
 
         TextMeshProUGUI headerTmp = headerObj.GetComponent<TextMeshProUGUI>();
         bool isCase2 = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Case02");
         string caseTitle = isCase2 ? "CASE 02 // CYPHER VAULT RESOLVED" : "CASE 01 // CASE RESOLVED";
-        headerTmp.text = $"<color=#00E5FF><b>{caseTitle}</b></color>\n<size=55%><color=#78909C>OFFICIAL FORENSIC BUREAU DEBRIEFING</color></size>";
+        headerTmp.text = $"<color=#00E5FF><b>{caseTitle}</b></color>\n<size=55%><color=#78909C>OFFICIAL FORENSIC BUREAU EVALUATION REPORT</color></size>";
         headerTmp.alignment = TextAlignmentOptions.Center;
         headerTmp.fontSize = 28f;
 
@@ -1162,56 +1319,56 @@ public class UIManager : MonoBehaviour
         GameObject gradeObj = new GameObject("FinalGradeText", typeof(RectTransform), typeof(TextMeshProUGUI));
         gradeObj.transform.SetParent(card.transform, false);
         RectTransform gradeRt = gradeObj.GetComponent<RectTransform>();
-        gradeRt.anchorMin = new Vector2(0.5f, 0.5f);
-        gradeRt.anchorMax = new Vector2(0.5f, 0.5f);
+        gradeRt.anchorMin = new Vector2(0.05f, 0.44f);
+        gradeRt.anchorMax = new Vector2(0.95f, 0.82f);
+        gradeRt.offsetMin = Vector2.zero;
+        gradeRt.offsetMax = Vector2.zero;
         gradeRt.pivot = new Vector2(0.5f, 0.5f);
-        gradeRt.sizeDelta = new Vector2(750f, 130f);
-        gradeRt.anchoredPosition = new Vector2(0f, 45f);
 
         finalGradeText = gradeObj.GetComponent<TextMeshProUGUI>();
         finalGradeText.alignment = TextAlignmentOptions.Center;
-        finalGradeText.fontSize = 24f;
+        finalGradeText.fontSize = 26f;
 
         // 5. قسم الوقت المستغرق (Time Taken) في اليسار
         GameObject timeObj = new GameObject("TimeTakenText", typeof(RectTransform), typeof(TextMeshProUGUI));
         timeObj.transform.SetParent(card.transform, false);
         RectTransform timeRt = timeObj.GetComponent<RectTransform>();
-        timeRt.anchorMin = new Vector2(0.5f, 0.5f);
-        timeRt.anchorMax = new Vector2(0.5f, 0.5f);
+        timeRt.anchorMin = new Vector2(0.06f, 0.22f);
+        timeRt.anchorMax = new Vector2(0.48f, 0.40f);
+        timeRt.offsetMin = Vector2.zero;
+        timeRt.offsetMax = Vector2.zero;
         timeRt.pivot = new Vector2(0.5f, 0.5f);
-        timeRt.sizeDelta = new Vector2(320f, 70f);
-        timeRt.anchoredPosition = new Vector2(-190f, -65f);
 
         timeTakenText = timeObj.GetComponent<TextMeshProUGUI>();
         timeTakenText.alignment = TextAlignmentOptions.Center;
-        timeTakenText.fontSize = 18f;
+        timeTakenText.fontSize = 19f;
 
         // 6. قسم النقاط والأدلة (Evidence Score) في اليمين
         GameObject scoreObj = new GameObject("EvidenceScoreText", typeof(RectTransform), typeof(TextMeshProUGUI));
         scoreObj.transform.SetParent(card.transform, false);
         RectTransform scoreRt = scoreObj.GetComponent<RectTransform>();
-        scoreRt.anchorMin = new Vector2(0.5f, 0.5f);
-        scoreRt.anchorMax = new Vector2(0.5f, 0.5f);
+        scoreRt.anchorMin = new Vector2(0.52f, 0.22f);
+        scoreRt.anchorMax = new Vector2(0.94f, 0.40f);
+        scoreRt.offsetMin = Vector2.zero;
+        scoreRt.offsetMax = Vector2.zero;
         scoreRt.pivot = new Vector2(0.5f, 0.5f);
-        scoreRt.sizeDelta = new Vector2(320f, 70f);
-        scoreRt.anchoredPosition = new Vector2(190f, -65f);
 
         evidenceScoreText = scoreObj.GetComponent<TextMeshProUGUI>();
         evidenceScoreText.alignment = TextAlignmentOptions.Center;
-        evidenceScoreText.fontSize = 18f;
+        evidenceScoreText.fontSize = 19f;
 
         // 7. زر العودة للقائمة الرئيسية (Main Menu Button - على اليسار)
         GameObject returnBtnObj = new GameObject("ReturnToMenuBtn", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
         returnBtnObj.transform.SetParent(card.transform, false);
         RectTransform btnRt = returnBtnObj.GetComponent<RectTransform>();
-        btnRt.anchorMin = new Vector2(0.5f, 0f);
-        btnRt.anchorMax = new Vector2(0.5f, 0f);
-        btnRt.pivot = new Vector2(0.5f, 0f);
-        btnRt.sizeDelta = new Vector2(330f, 52f);
-        btnRt.anchoredPosition = new Vector2(-185f, 30f);
+        btnRt.anchorMin = new Vector2(0.06f, 0.05f);
+        btnRt.anchorMax = new Vector2(0.48f, 0.17f);
+        btnRt.offsetMin = Vector2.zero;
+        btnRt.offsetMax = Vector2.zero;
+        btnRt.pivot = new Vector2(0.5f, 0.5f);
 
         Image btnImg = returnBtnObj.GetComponent<Image>();
-        btnImg.color = new Color(0.12f, 0.16f, 0.22f, 0.98f); // Dark Slate
+        btnImg.color = new Color(0.14f, 0.18f, 0.24f, 0.98f); // Dark Slate
 
         Button returnBtn = returnBtnObj.GetComponent<Button>();
         returnBtn.onClick.RemoveAllListeners();
@@ -1235,14 +1392,14 @@ public class UIManager : MonoBehaviour
         GameObject proceedBtnObj = new GameObject("ProceedCaseBtn", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
         proceedBtnObj.transform.SetParent(card.transform, false);
         RectTransform proceedRt = proceedBtnObj.GetComponent<RectTransform>();
-        proceedRt.anchorMin = new Vector2(0.5f, 0f);
-        proceedRt.anchorMax = new Vector2(0.5f, 0f);
-        proceedRt.pivot = new Vector2(0.5f, 0f);
-        proceedRt.sizeDelta = new Vector2(330f, 52f);
-        proceedRt.anchoredPosition = new Vector2(185f, 30f);
+        proceedRt.anchorMin = new Vector2(0.52f, 0.05f);
+        proceedRt.anchorMax = new Vector2(0.94f, 0.17f);
+        proceedRt.offsetMin = Vector2.zero;
+        proceedRt.offsetMax = Vector2.zero;
+        proceedRt.pivot = new Vector2(0.5f, 0.5f);
 
         Image proceedImg = proceedBtnObj.GetComponent<Image>();
-        proceedImg.color = new Color(0.04f, 0.48f, 0.58f, 0.98f); // Cyan Teal Accent
+        proceedImg.color = new Color(0.05f, 0.55f, 0.65f, 0.98f); // Cyan Accent
 
         Button proceedBtn = proceedBtnObj.GetComponent<Button>();
         proceedBtn.onClick.RemoveAllListeners();
@@ -1303,20 +1460,61 @@ public class UIManager : MonoBehaviour
         PlayerPrefs.SetString("Selected_Case", nextScene);
         PlayerPrefs.Save();
 
-        // In a real multiplayer match the MasterClient must load the scene
-        // through Photon so every player enters Case 2 together with the role
-        // they selected in the lobby. Local testing uses SceneManager.
+        // الحفاظ التام على أدوار وهوية اللاعبين الأربعة
+        string savedRole = PlayerPrefs.GetString("Player_Role", "Field Detective");
+        string savedGender = PlayerPrefs.GetString("Player_Gender", "Male");
+        string savedName = PlayerPrefs.GetString("Player_Name", "Detective 1");
+
+        Debug.Log($"<color=cyan>[TRANSITION TO CASE 2]</color> Preserving Agent: {savedName} | Role: {savedRole} | Gender: {savedGender}");
+
         if (Photon.Pun.PhotonNetwork.InRoom)
         {
-            if (Photon.Pun.PhotonNetwork.IsMasterClient)
-                Photon.Pun.PhotonNetwork.LoadLevel(nextScene);
-            else
-                Debug.Log("[CASE TRANSITION] Waiting for MasterClient to load Case02_Main.");
+            ShowOnScreenNotification("CASE 02 READY // WAITING FOR ALL PLAYERS...", 999f);
+
+            // إعادة ضبط خاصية الإكمال للقضية الجديدة في البروبرتيز مع الاحتفاظ بالدور والجنس
+            ExitGames.Client.Photon.Hashtable playerProps = new ExitGames.Client.Photon.Hashtable
+            {
+                { "Role", savedRole },
+                { "Gender", savedGender },
+                { "CaseComplete", false },
+                { Case2ReadyProperty, true }
+            };
+            Photon.Pun.PhotonNetwork.LocalPlayer.SetCustomProperties(playerProps);
+
+            // الهوست فقط يراقب جاهزية الجميع ويبدأ التحميل المتزامن.
+            Photon.Pun.PhotonNetwork.AutomaticallySyncScene = true;
         }
         else
         {
+            // في اللعب الفردي (Solo / Offline)
             UnityEngine.SceneManagement.SceneManager.LoadScene(nextScene);
         }
+    }
+
+    private void CheckCoopCase2Transition()
+    {
+        if (!Photon.Pun.PhotonNetwork.InRoom || !Photon.Pun.PhotonNetwork.IsMasterClient || case2TransitionStarted)
+            return;
+
+        Photon.Realtime.Player[] players = Photon.Pun.PhotonNetwork.PlayerList;
+        if (players == null || players.Length == 0) return;
+
+        foreach (Photon.Realtime.Player player in players)
+        {
+            if (!player.CustomProperties.TryGetValue(Case2ReadyProperty, out object ready) || !(ready is bool) || !(bool)ready)
+                return;
+        }
+
+        case2TransitionStarted = true;
+        if (Photon.Pun.PhotonNetwork.CurrentRoom != null)
+        {
+            Photon.Pun.PhotonNetwork.CurrentRoom.SetCustomProperties(new ExitGames.Client.Photon.Hashtable
+            {
+                { "CollectedEvidenceIDs_Case02", new string[0] }
+            });
+        }
+        Debug.Log("[CASE TRANSITION] All players are ready. Loading Case02_Main together.");
+        Photon.Pun.PhotonNetwork.LoadLevel("Case02_Main");
     }
 
     public void ToggleSettings()
@@ -1325,6 +1523,8 @@ public class UIManager : MonoBehaviour
         if (settingsPanel == null) return;
         
         bool isOpen = !settingsPanel.activeSelf;
+        if (inGameHUD != null) inGameHUD.SetActive(!isOpen);
+        SetMobileControlsActive(!isOpen);
         settingsPanel.SetActive(isOpen);
         
         if (isOpen)

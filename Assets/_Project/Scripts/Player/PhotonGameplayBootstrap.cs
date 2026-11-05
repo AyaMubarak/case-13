@@ -26,5 +26,6 @@ public static class PhotonGameplayBootstrap
 
         GameObject manager = new GameObject("Photon Gameplay Replicator");
         manager.AddComponent<PhotonGameplayReplicator>();
+        manager.AddComponent<PhotonTeamChat>();
     }
 }

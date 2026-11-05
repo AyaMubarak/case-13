@@ -52,11 +52,14 @@ public class Evidence : MonoBehaviour, IInteractable
             sphere = gameObject.AddComponent<SphereCollider>();
         }
         sphere.isTrigger = true;
-        sphere.radius = Mathf.Max(sphere.radius, 0.5f);
+        sphere.radius = Mathf.Clamp(sphere.radius, 0.25f, 0.35f);
     }
 
     public bool CanInteractWithCurrentRole()
     {
+        // في نمط اللعب الفردي (Solo)، المحقق يمتلك جميع الأدوار وجميع الأدلة مفتوحة له
+        if (PlayerPrefs.GetInt("Game_Mode", 1) == 0) return true;
+
         if (requiredRole == DetectiveRole.Any) return true;
 
         PlayerProfile profile = PlayerProfile.LocalInstance;

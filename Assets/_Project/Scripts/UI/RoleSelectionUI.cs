@@ -38,6 +38,26 @@ public class RoleSelectionUI : MonoBehaviour
     {
         ConfigureTabletPresentation();
 
+        // في نمط اللعب الفردي (Solo Mode): تخطي فوري وشامل لجميع شاشات اختيار الدور أو الاسم ونشر اللاعب مباشرة
+        bool isSoloMode = PlayerPrefs.GetInt("Game_Mode", 1) == 0;
+        if (isSoloMode)
+        {
+            Debug.Log("<color=cyan>[RoleSelectionUI] Solo Investigation mode active: Bypassing Role and Name selection. Auto-deploying operative.</color>");
+            PlayerProfile p = PlayerProfile.LocalPlayer;
+            if (p == null) p = FindAnyObjectByType<PlayerProfile>(FindObjectsInactive.Include);
+
+            if (p != null)
+            {
+                p.agentCodename = PlayerPrefs.GetString("Player_Name", "Detective");
+                string savedGender = PlayerPrefs.GetString("Player_Gender", "Male");
+                selectedGender = savedGender == "Female" ? DetectiveGender.Female : DetectiveGender.Male;
+                p.gender = selectedGender;
+                p.currentRole = DetectiveRole.FieldDetective;
+                SelectRoleAndDeploy(DetectiveRole.FieldDetective);
+                return;
+            }
+        }
+
         if (autoDeployFromLobby)
         {
             PlayerProfile p = PlayerProfile.LocalPlayer;

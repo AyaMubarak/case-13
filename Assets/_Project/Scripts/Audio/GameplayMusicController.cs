@@ -22,4 +22,14 @@ public sealed class GameplayMusicController : MonoBehaviour
     {
         if (source.clip != null && !source.isPlaying) source.Play();
     }
+
+    public void PauseForOverlay()
+    {
+        if (source != null) source.mute = true;
+    }
+
+    public void ResumeAfterOverlay()
+    {
+        if (source != null) source.mute = false;
+    }
 }

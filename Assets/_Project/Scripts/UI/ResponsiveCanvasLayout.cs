@@ -14,6 +14,14 @@ public class ResponsiveCanvasLayout : MonoBehaviour
     private int lastScreenWidth;
     private int lastScreenHeight;
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void InstallOnActiveCanvas()
+    {
+        Canvas canvas = FindAnyObjectByType<Canvas>();
+        if (canvas != null && canvas.GetComponent<ResponsiveCanvasLayout>() == null)
+            canvas.gameObject.AddComponent<ResponsiveCanvasLayout>();
+    }
+
     private void Awake()
     {
         EnsureCanvasInput();
@@ -33,7 +41,7 @@ public class ResponsiveCanvasLayout : MonoBehaviour
         if (GetComponent<GraphicRaycaster>() == null)
             gameObject.AddComponent<GraphicRaycaster>();
 
-        if (EventSystem.current == null && FindObjectsByType<EventSystem>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length == 0)
+        if (EventSystem.current == null && FindObjectsByType<EventSystem>(FindObjectsInactive.Include).Length == 0)
         {
             GameObject eventSystemObject = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
             DontDestroyOnLoad(eventSystemObject);

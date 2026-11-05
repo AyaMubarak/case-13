@@ -28,6 +28,9 @@ public class PlayerMovement : MonoBehaviour
 
     private void Awake()
     {
+        PlayerProfile p = GetComponent<PlayerProfile>();
+        if (p != null) p.OnProfileChanged += RefreshAnimators;
+
         // Get Rigidbody safely
         if (!TryGetComponent<Rigidbody>(out rb))
         {
@@ -68,57 +71,134 @@ public class PlayerMovement : MonoBehaviour
 
     private void Start()
     {
-        MoveOutOfBlockedCaseOneSpawn();
+        PositionPlayerAtUniqueSpawnPoint();
     }
 
-    private void MoveOutOfBlockedCaseOneSpawn()
+    private void PositionPlayerAtUniqueSpawnPoint()
     {
-        if (!SceneManager.GetActiveScene().name.Contains("Case01")) return;
-        if (!IsBlocked(transform.position)) return;
+        int spawnIndex = GetPlayerSpawnIndex();
+        string currentScene = SceneManager.GetActiveScene().name;
+        Vector3 chosenPos;
 
-        int roleIndex = GetRoleSpawnIndex();
-        Vector3 origin = transform.position;
-        for (int ring = 1; ring <= 8; ring++)
+        // نقاط انطلاق معتمدة ومفتوحة تماماً وبعيدة عن أي حواف أو مجسمات في كلتا الحالتين
+        if (currentScene == "Case02_Main")
         {
-            for (int step = 0; step < 12; step++)
+            // Case 2: الممر الرئيسي لمعمل الخيال العلمي (أرضية سالكة ومفتوحة بين Z=30 و Z=38)
+            Vector3[] case2SafeSpawns = new Vector3[]
             {
-                float angle = (step * 30f) + (roleIndex * 90f);
-                Vector3 offset = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * ring;
-                if (!NavMesh.SamplePosition(origin + offset, out NavMeshHit hit, 1.25f, NavMesh.AllAreas)) continue;
-                if (IsBlocked(hit.position)) continue;
+                new Vector3(4.2f, 0.05f, 31.0f),  // اللاعب 1
+                new Vector3(2.5f, 0.05f, 33.5f),  // اللاعب 2
+                new Vector3(5.8f, 0.05f, 34.0f),  // اللاعب 3
+                new Vector3(3.8f, 0.05f, 36.5f)   // اللاعب 4
+            };
+            chosenPos = case2SafeSpawns[Mathf.Clamp(spawnIndex, 0, case2SafeSpawns.Length - 1)];
+        }
+        else
+        {
+            // Case 1: المكتب التحقيقي الرئيسي - ساحة فسيحة خالية من الطاولات والأعمدة
+            Vector3[] case1SafeSpawns = new Vector3[]
+            {
+                new Vector3(0.0f, 0.05f, 0.0f),   // اللاعب 1 (مركز الغرفة)
+                new Vector3(1.8f, 0.05f, 1.2f),   // اللاعب 2
+                new Vector3(-1.8f, 0.05f, 1.2f),  // اللاعب 3
+                new Vector3(0.0f, 0.05f, 2.5f)    // اللاعب 4
+            };
+            chosenPos = case1SafeSpawns[Mathf.Clamp(spawnIndex, 0, case1SafeSpawns.Length - 1)];
+        }
 
-                transform.position = hit.position;
-                rb.position = hit.position;
-                return;
+        // 1. التحقق من سلامة النقطة المحددة عبر كبسولة اللاعب ومطابقة NavMesh
+        if (IsSpawnPositionSafe(chosenPos, out Vector3 safePos))
+        {
+            ApplySpawnPosition(safePos);
+            return;
+        }
+
+        // 2. إذا كانت هناك عوائق غير متوقعة، نفحص في حلقات دائرية صغيرة بحثاً عن أقرب أرضية شاغرة
+        for (int ring = 1; ring <= 6; ring++)
+        {
+            for (int step = 0; step < 8; step++)
+            {
+                float angle = (step * 45f) + (spawnIndex * 30f);
+                Vector3 candidate = chosenPos + Quaternion.Euler(0f, angle, 0f) * Vector3.forward * (ring * 0.5f);
+                if (IsSpawnPositionSafe(candidate, out safePos))
+                {
+                    ApplySpawnPosition(safePos);
+                    return;
+                }
             }
+        }
+
+        // 3. Fallback: تطبيق النقطة الآمنة الأساسية مع الارتفاع الصافي
+        ApplySpawnPosition(chosenPos);
+    }
+
+    private bool IsSpawnPositionSafe(Vector3 testPos, out Vector3 safePos)
+    {
+        safePos = testPos;
+
+        // أ) التحقق من وجود أرضية صلبة أسفل الموقع بمسافة لا تزيد عن 2 متر
+        Vector3 rayStart = testPos + Vector3.up * 1.5f;
+        int groundMask = groundLayers == 0 ? ~LayerMask.GetMask("Ignore Raycast", "UI") : (int)groundLayers;
+
+        if (Physics.Raycast(rayStart, Vector3.down, out RaycastHit groundHit, 3.0f, groundMask, QueryTriggerInteraction.Ignore))
+        {
+            // تجنب الاسقاط على أجسام اللاعب نفسه أو أسطح مرتفعة (كالطاولات)
+            if (groundHit.collider.transform.root != transform.root)
+            {
+                safePos.y = groundHit.point.y;
+            }
+        }
+
+        // ب) التحقق من وجود NavMesh قريب إذا وجد
+        if (NavMesh.SamplePosition(safePos, out NavMeshHit navHit, 1.0f, NavMesh.AllAreas))
+        {
+            safePos = navHit.position;
+        }
+
+        // ج) التحقق من عدم وجود تصادم كبسولي (حائط، مكتب، جهاز) في المكان
+        float colRadius = playerCollider != null ? playerCollider.radius * 0.9f : 0.35f;
+        float colHeight = playerCollider != null ? playerCollider.height : 1.8f;
+        Vector3 p1 = safePos + Vector3.up * colRadius;
+        Vector3 p2 = safePos + Vector3.up * Mathf.Max(colRadius, colHeight - colRadius);
+
+        int colMask = collisionLayers == 0 ? ~0 : (int)collisionLayers;
+        Collider[] overlaps = Physics.OverlapCapsule(p1, p2, colRadius, colMask, QueryTriggerInteraction.Ignore);
+        foreach (Collider col in overlaps)
+        {
+            if (col != null && col.transform.root != transform.root && !col.isTrigger)
+            {
+                // يوجد تصادم مع جدار أو أثاث
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void ApplySpawnPosition(Vector3 newPos)
+    {
+        transform.position = newPos;
+        if (rb != null)
+        {
+            rb.position = newPos;
+            rb.linearVelocity = Vector3.zero;
         }
     }
 
-    private bool IsBlocked(Vector3 position)
+    private static int GetPlayerSpawnIndex()
     {
-        bool colliderWasEnabled = playerCollider.enabled;
-        playerCollider.enabled = false;
+        // إذا كنا متصلين بروم أونلاين في Photon، نعتمد على رقم اللاعب لضمان التمايز التام
+        if (Photon.Pun.PhotonNetwork.InRoom && Photon.Pun.PhotonNetwork.LocalPlayer != null)
+        {
+            return Mathf.Abs(Photon.Pun.PhotonNetwork.LocalPlayer.ActorNumber - 1) % 4;
+        }
 
-        float radius = playerCollider.radius;
-        float halfSegment = Mathf.Max(0f, (playerCollider.height * 0.5f) - radius);
-        Vector3 center = position + playerCollider.center;
-        bool blocked = Physics.CheckCapsule(
-            center + Vector3.up * halfSegment,
-            center - Vector3.up * halfSegment,
-            radius,
-            collisionLayers,
-            QueryTriggerInteraction.Ignore);
-
-        playerCollider.enabled = colliderWasEnabled;
-        return blocked;
-    }
-
-    private static int GetRoleSpawnIndex()
-    {
+        // أو حسب الدور المختار
         string role = PlayerPrefs.GetString("Player_Role", "Field Detective");
-        if (role.Contains("Forensics")) return 1;
-        if (role.Contains("Digital")) return 2;
-        if (role.Contains("Interrogator")) return 3;
+        if (role.Contains("Forensic") || role.Contains("Doctor")) return 1;
+        if (role.Contains("Digital") || role.Contains("Tech") || role.Contains("Analyst")) return 2;
+        if (role.Contains("Interrogat")) return 3;
+
         return 0;
     }
 
@@ -466,5 +546,16 @@ public class PlayerMovement : MonoBehaviour
 
         // Nothing in front of player
         return wantedDistance;
+    }
+
+    public void RefreshAnimators()
+    {
+        animators = GetComponentsInChildren<Animator>(true);
+    }
+
+    private void OnDestroy()
+    {
+        PlayerProfile p = GetComponent<PlayerProfile>();
+        if (p != null) p.OnProfileChanged -= RefreshAnimators;
     }
 }
