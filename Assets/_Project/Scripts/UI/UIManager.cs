@@ -395,7 +395,6 @@ public class UIManager : MonoBehaviour
 
     private void Update()
     {
-        CheckCoopCase2Transition();
         if (endGamePanel != null && endGamePanel.activeSelf)
         {
             UpdateProceedButtonForHostState();
@@ -434,6 +433,16 @@ public class UIManager : MonoBehaviour
     public void ToggleInterrogationDossier()
     {
         if (!isGameActive) return;
+
+        // After both interviews, the mobile Files button must open the final
+        // two-suspect dossier (the split-screen Nora/Evan or Victor/Elena
+        // view), not the general evidence dossier owned by CaseDossierManager.
+        SeparateInterrogationManager interrogation = SeparateInterrogationManager.Instance;
+        if (interrogation != null && interrogation.AreBothSuspectsCompleted)
+        {
+            interrogation.OpenLogPanel();
+            return;
+        }
 
         // The icon is always visible, but the dossier panel is unavailable
         // until Victor and Elena have both completed their interrogations.
@@ -1047,7 +1056,7 @@ public class UIManager : MonoBehaviour
 
     public void ShowOnScreenNotification(string message, float duration = 5.5f)
     {
-        if (notificationBannerText == null) return;
+        if (notificationBannerText == null) ResolveCaseHudReferences();
 
         if (inGameHUD != null && !inGameHUD.activeSelf && isGameActive && !isInventoryOpen)
         {
@@ -1061,21 +1070,86 @@ public class UIManager : MonoBehaviour
         notificationCoroutine = StartCoroutine(NotificationRoutine(message, duration));
     }
 
-    private IEnumerator NotificationRoutine(string message, float duration)
-    {
-        notificationBannerText.text = message;
+    // تنبيه احتياطي مستقل يظهر فوق كل شيء عندما يكون شريط التنبيه الأصلي غير موجود أو مخفي (أثناء الفحص/الفيديو/القوائم)
+    private GameObject fallbackToastRoot;
+    private TextMeshProUGUI fallbackToastText;
 
-        if (notificationBannerText.transform.parent != null)
+    private void ShowFallbackToast(string message, bool show)
+    {
+        if (fallbackToastRoot == null)
         {
-            notificationBannerText.transform.parent.gameObject.SetActive(true);
+            if (!show) return;
+            fallbackToastRoot = new GameObject("Fallback_Notification_Canvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
+            Canvas c = fallbackToastRoot.GetComponent<Canvas>();
+            c.renderMode = RenderMode.ScreenSpaceOverlay;
+            c.sortingOrder = 6000;
+            CanvasScaler s = fallbackToastRoot.GetComponent<CanvasScaler>();
+            s.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            s.referenceResolution = new Vector2(1280f, 720f);
+            s.matchWidthOrHeight = 0.5f;
+
+            GameObject panel = new GameObject("Toast", typeof(RectTransform), typeof(Image));
+            panel.transform.SetParent(fallbackToastRoot.transform, false);
+            RectTransform prt = panel.GetComponent<RectTransform>();
+            prt.anchorMin = new Vector2(0.5f, 1f);
+            prt.anchorMax = new Vector2(0.5f, 1f);
+            prt.pivot = new Vector2(0.5f, 1f);
+            prt.sizeDelta = new Vector2(720f, 48f);
+            prt.anchoredPosition = new Vector2(0f, -130f);
+            Image img = panel.GetComponent<Image>();
+            img.color = new Color(0.04f, 0.07f, 0.12f, 0.9f);
+            img.raycastTarget = false;
+
+            GameObject txt = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+            txt.transform.SetParent(panel.transform, false);
+            RectTransform trt = txt.GetComponent<RectTransform>();
+            trt.anchorMin = Vector2.zero;
+            trt.anchorMax = Vector2.one;
+            trt.offsetMin = new Vector2(12f, 4f);
+            trt.offsetMax = new Vector2(-12f, -4f);
+            fallbackToastText = txt.GetComponent<TextMeshProUGUI>();
+            fallbackToastText.fontSize = 18;
+            fallbackToastText.alignment = TextAlignmentOptions.Center;
+            fallbackToastText.color = new Color(0f, 0.9f, 1f);
+            fallbackToastText.raycastTarget = false;
+            fallbackToastText.overflowMode = TextOverflowModes.Ellipsis;
         }
 
-        yield return new WaitForSeconds(duration);
+        if (show && fallbackToastText != null) fallbackToastText.text = message;
+        fallbackToastRoot.SetActive(show);
+    }
 
-        if (notificationBannerText.transform.parent != null)
+    private IEnumerator NotificationRoutine(string message, float duration)
+    {
+        bool usedFallback = false;
+
+        if (notificationBannerText != null)
+        {
+            notificationBannerText.text = message;
+            if (notificationBannerText.transform.parent != null)
+            {
+                notificationBannerText.transform.parent.gameObject.SetActive(true);
+            }
+        }
+
+        // إذا كان الشريط الأصلي غير مرئي فعلياً (أحد آبائه مخفي)، نستخدم التنبيه الاحتياطي
+        if (notificationBannerText == null || !notificationBannerText.gameObject.activeInHierarchy)
+        {
+            usedFallback = true;
+            ShowFallbackToast(message, true);
+        }
+        else
+        {
+            ShowFallbackToast(null, false);
+        }
+
+        yield return new WaitForSecondsRealtime(duration);
+
+        if (notificationBannerText != null && notificationBannerText.transform.parent != null)
         {
             notificationBannerText.transform.parent.gameObject.SetActive(false);
         }
+        if (usedFallback) ShowFallbackToast(null, false);
     }
 
     public void ShowEndGameScreen()
@@ -1522,6 +1596,8 @@ public class UIManager : MonoBehaviour
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
+        CaseIntroCutscene.ResetCompletedIntrosForNewMatch();
+
         const string nextScene = "Case02_Main";
         PlayerPrefs.SetString("Selected_Case", nextScene);
         PlayerPrefs.Save();
@@ -1546,6 +1622,11 @@ public class UIManager : MonoBehaviour
             case2TransitionStarted = true;
 
             ShowOnScreenNotification("LAUNCHING CASE 02 FOR ALL SQUAD MEMBERS...", 5f);
+            ShowTransitionWaitingScreen("TRANSITIONING TO CASE 02\nWAITING FOR SQUAD TO ASSEMBLE...");
+
+            // إرسال إشعار لحظي لبقية الأجهزة لإظهار شاشة الانتظار
+            Photon.Pun.PhotonNetwork.RaiseEvent(PhotonGameplayReplicator.SquadSceneTransitionEventCode, nextScene,
+                new Photon.Realtime.RaiseEventOptions { Receivers = Photon.Realtime.ReceiverGroup.Others }, ExitGames.Client.Photon.SendOptions.SendReliable);
 
             // إعادة ضبط خاصية الإكمال للقضية الجديدة في البروبرتيز مع الاحتفاظ بالدور والجنس
             ExitGames.Client.Photon.Hashtable playerProps = new ExitGames.Client.Photon.Hashtable
@@ -1563,7 +1644,8 @@ public class UIManager : MonoBehaviour
                 {
                     { "ActiveCaseScene", nextScene },
                     { "CollectedEvidenceIDs_Case02", new string[0] },
-                    { "InterrogationStage_Case02", 0 }
+                    { "InterrogationStage_Case02", 0 },
+                    { "IntroDone_Case02", false }
                 });
             }
 
@@ -1578,9 +1660,70 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    private void CheckCoopCase2Transition()
+    private static GameObject transitionWaitingOverlay;
+
+    public void ShowTransitionWaitingScreen(string message = "TRANSITIONING TO CASE 02\nWAITING FOR SQUAD TO ASSEMBLE...")
     {
-        // الهوست ينقل الفريق بأكمله مباشرة عند الضغط على ProceedToNextCase()
+        Canvas canvas = GetMainCanvas();
+        if (canvas == null) return;
+
+        if (endGamePanel != null) endGamePanel.SetActive(false);
+        if (inGameHUD != null) inGameHUD.SetActive(false);
+        SetMobileControlsActive(false);
+
+        if (transitionWaitingOverlay == null)
+        {
+            transitionWaitingOverlay = new GameObject("TransitionWaitingOverlay", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            transitionWaitingOverlay.transform.SetParent(canvas.transform, false);
+
+            Canvas oCanvas = transitionWaitingOverlay.GetComponent<Canvas>();
+            if (oCanvas == null) oCanvas = transitionWaitingOverlay.AddComponent<Canvas>();
+            oCanvas.overrideSorting = true;
+            oCanvas.sortingOrder = 3000;
+
+            if (transitionWaitingOverlay.GetComponent<GraphicRaycaster>() == null)
+                transitionWaitingOverlay.AddComponent<GraphicRaycaster>();
+
+            RectTransform rt = transitionWaitingOverlay.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            Image img = transitionWaitingOverlay.GetComponent<Image>();
+            img.color = new Color(0.02f, 0.04f, 0.07f, 0.99f);
+
+            GameObject textObj = new GameObject("WaitingText", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textObj.transform.SetParent(transitionWaitingOverlay.transform, false);
+            RectTransform trt = textObj.GetComponent<RectTransform>();
+            trt.anchorMin = new Vector2(0.1f, 0.35f);
+            trt.anchorMax = new Vector2(0.9f, 0.65f);
+            trt.offsetMin = Vector2.zero;
+            trt.offsetMax = Vector2.zero;
+
+            TextMeshProUGUI tmp = textObj.GetComponent<TextMeshProUGUI>();
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.fontSize = 24f;
+            tmp.color = new Color(0.0f, 0.9f, 1.0f, 1f);
+            tmp.text = $"<b>{message}</b>";
+        }
+        else
+        {
+            transitionWaitingOverlay.SetActive(true);
+            transitionWaitingOverlay.transform.SetAsLastSibling();
+            TextMeshProUGUI tmp = transitionWaitingOverlay.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (tmp != null) tmp.text = $"<b>{message}</b>";
+        }
+    }
+
+    public static void HideTransitionWaitingScreen()
+    {
+        if (transitionWaitingOverlay != null)
+        {
+            transitionWaitingOverlay.SetActive(false);
+            Destroy(transitionWaitingOverlay);
+            transitionWaitingOverlay = null;
+        }
     }
 
     public void ToggleSettings()

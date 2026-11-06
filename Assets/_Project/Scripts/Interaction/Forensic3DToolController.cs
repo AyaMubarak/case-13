@@ -31,6 +31,7 @@ namespace InvestigationGame
 
         public bool IsInteracting => isInteracting;
         private bool isInteracting = false;
+        private bool analysisActive = false;
         private float interactionProgress = 0f;
         private const float REQUIRED_PROGRESS = 1.0f;
 
@@ -64,8 +65,10 @@ namespace InvestigationGame
                 targetEvidenceTransform = evidence.transform;
             }
 
+            CleanupTool();
             BuildForensic3DTool(toolType);
             CreateInteractiveHud(toolName, instruction);
+            analysisActive = true;
 
             // تفعيل الماوس أو اللمس
             Cursor.lockState = CursorLockMode.None;
@@ -74,7 +77,8 @@ namespace InvestigationGame
 
         private void Update()
         {
-            if (toolRootObject == null || interactionProgress >= REQUIRED_PROGRESS) return;
+            // لا نعتمد على وجود المجسم فقط: حتى لو فشل بناؤه، يبقى الفحص قابلاً للإكمال ولا تعلق اللعبة
+            if (!analysisActive || interactionProgress >= REQUIRED_PROGRESS) return;
 
             // كشف تفاعل اللاعب (سحب أو ضغط بالماوس أو لمس الشاشة)
             bool isPressing = Input.GetMouseButton(0) 
@@ -175,6 +179,7 @@ namespace InvestigationGame
 
         private IEnumerator FinishAnalysisRoutine()
         {
+            analysisActive = false;
             if (hudInstructionText != null)
             {
                 hudInstructionText.text = "<color=#00E676><b>✔ 3D FORENSIC EXAMINATION COMPLETE!</b></color>";
@@ -198,6 +203,8 @@ namespace InvestigationGame
 
         public void CleanupTool()
         {
+            RestoreCamera();
+
             if (toolRootObject != null)
             {
                 Destroy(toolRootObject);
@@ -219,23 +226,40 @@ namespace InvestigationGame
         {
             if (toolRootObject != null) Destroy(toolRootObject);
 
-            Camera mainCam = Camera.main;
+            Camera mainCam = ResolveRenderingCamera();
             if (mainCam == null) return;
 
             toolRootObject = new GameObject("Forensic_3D_Tool_Root");
             toolRootObject.transform.SetParent(mainCam.transform, false);
 
-            // موقع الأداة في أسفل يمين شاشة الكاميرا ليراها اللاعب بوضوح ثلاثي الأبعاد
-            initialToolPos = new Vector3(0.20f, -0.15f, 0.45f);
+            // الأداة قريبة جداً من الكاميرا ومصغّرة، حتى لا تختفي داخل الجدران/الطاولات عند الاقتراب من الدليل
+            initialToolPos = new Vector3(0.11f, -0.08f, 0.24f);
             initialToolRot = Quaternion.Euler(-10f, -25f, 5f);
             toolRootObject.transform.localPosition = initialToolPos;
             toolRootObject.transform.localRotation = initialToolRot;
+            toolRootObject.transform.localScale = Vector3.one * 0.55f;
 
-            // ضبط طبقة الأداة على Default أو طبقة الكاميرا لضمان رؤيتها
-            toolRootObject.layer = 0;
+            // تقليل near clip مؤقتاً حتى لا تُقص الأداة
+            toolCamera = mainCam;
+            originalNearClip = mainCam.nearClipPlane;
+            if (mainCam.nearClipPlane > 0.02f) mainCam.nearClipPlane = 0.02f;
 
-            // مادة لامعة أساسية بتقنية Standard Shader
-            Shader standardShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            // طبقة مرئية لكاميرا اللاعب
+            int visibleLayer = 0;
+            if ((mainCam.cullingMask & 1) == 0)
+            {
+                for (int i = 0; i < 32; i++)
+                {
+                    if ((mainCam.cullingMask & (1 << i)) != 0) { visibleLayer = i; break; }
+                }
+            }
+            toolLayer = visibleLayer;
+
+            Shader standardShader = Shader.Find("Universal Render Pipeline/Lit");
+            if (standardShader == null) standardShader = Shader.Find("Universal Render Pipeline/Simple Lit");
+            if (standardShader == null) standardShader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (standardShader == null) standardShader = Shader.Find("Standard");
+            if (standardShader == null) standardShader = Shader.Find("Sprites/Default");
 
             switch (toolType)
             {
@@ -259,6 +283,47 @@ namespace InvestigationGame
                     BuildAcousticTunerModel(standardShader);
                     break;
             }
+
+            foreach (Transform t in toolRootObject.GetComponentsInChildren<Transform>(true))
+            {
+                t.gameObject.layer = toolLayer;
+            }
+            foreach (Renderer r in toolRootObject.GetComponentsInChildren<Renderer>(true))
+            {
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+            }
+        }
+
+        private Camera toolCamera;
+        private float originalNearClip = -1f;
+        private int toolLayer = 0;
+
+        /// <summary>
+        /// اختيار كاميرا اللاعب المحلي الفعلية التي ترسم الشاشة (وليس كاميرا لاعب آخر أو كاميرا معطلة).
+        /// </summary>
+        private Camera ResolveRenderingCamera()
+        {
+            Camera main = Camera.main;
+            if (main != null && main.isActiveAndEnabled && main.targetTexture == null) return main;
+
+            Camera best = null;
+            foreach (Camera c in Camera.allCameras)
+            {
+                if (c == null || !c.isActiveAndEnabled || c.targetTexture != null) continue;
+                if (best == null || c.depth > best.depth) best = c;
+            }
+            return best != null ? best : main;
+        }
+
+        private void RestoreCamera()
+        {
+            if (toolCamera != null && originalNearClip > 0f)
+            {
+                toolCamera.nearClipPlane = originalNearClip;
+            }
+            toolCamera = null;
+            originalNearClip = -1f;
         }
 
         private void BuildChemicalDropperModel(Shader shader)
@@ -355,6 +420,27 @@ namespace InvestigationGame
             toolPointLight.color = new Color(0.7f, 0.2f, 1f);
             toolPointLight.range = 2.5f;
             toolPointLight.intensity = 4.0f;
+
+            // الكشاف كان داكناً جداً وضوءه يتجه بعيداً عن الكاميرا، فيختفي في الغرف المظلمة (مثل كتاب القضية الأولى).
+            // نفتح ألوانه ونضيف توهجاً ذاتياً وضوءاً نقطياً يضيء الكشاف نفسه.
+            metalMat.color = new Color(0.45f, 0.48f, 0.55f);
+            headMat.color = new Color(0.55f, 0.58f, 0.66f);
+            EnableEmission(uvMat, new Color(0.7f, 0.2f, 1f) * 2.5f);
+            EnableEmission(headMat, new Color(0.25f, 0.08f, 0.4f));
+
+            Light selfGlow = torchHead.AddComponent<Light>();
+            selfGlow.type = LightType.Point;
+            selfGlow.color = new Color(0.75f, 0.45f, 1f);
+            selfGlow.range = 0.6f;
+            selfGlow.intensity = 2.5f;
+        }
+
+        private static void EnableEmission(Material mat, Color emission)
+        {
+            if (mat == null) return;
+            mat.EnableKeyword("_EMISSION");
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            if (mat.HasProperty("_EmissionColor")) mat.SetColor("_EmissionColor", emission);
         }
 
         private void BuildCyberProbeModel(Shader shader)
@@ -463,23 +549,15 @@ namespace InvestigationGame
         /// </summary>
         private void CreateInteractiveHud(string toolName, string instruction)
         {
-            Canvas canvas = GetComponentInParent<Canvas>();
-            if (canvas == null)
-            {
-                Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Include);
-                foreach (Canvas candidate in canvases)
-                {
-                    if (candidate != null && candidate.isActiveAndEnabled && candidate.renderMode != RenderMode.WorldSpace)
-                    {
-                        canvas = candidate;
-                        break;
-                    }
-                }
-            }
-            if (canvas == null) return;
-
-            toolHudCanvas = new GameObject("Forensic_3D_Tool_HUD", typeof(RectTransform));
-            toolHudCanvas.transform.SetParent(canvas.transform, false);
+            // Canvas مستقل دائماً فوق كل الواجهات، حتى لا يختفي الـ HUD إذا كانت واجهة اللعب الأصلية مخفية
+            toolHudCanvas = new GameObject("Forensic_3D_Tool_HUD", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            Canvas ownCanvas = toolHudCanvas.GetComponent<Canvas>();
+            ownCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            ownCanvas.sortingOrder = 5000;
+            CanvasScaler scaler = toolHudCanvas.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1280f, 720f);
+            scaler.matchWidthOrHeight = 0.5f;
 
             RectTransform hudRt = toolHudCanvas.GetComponent<RectTransform>();
             hudRt.anchorMin = Vector2.zero;

@@ -370,6 +370,36 @@ public class EvidenceCutsceneManager : MonoBehaviour
     {
         Stretch(videoPanel != null ? videoPanel.transform as RectTransform : null);
         Stretch(videoScreen != null ? videoScreen.rectTransform : null);
+
+        // Keep Skip readable and inside the safe area on tablet aspect ratios.
+        // The old scene position was authored for a phone and could overlap
+        // the video edge or appear stretched on 4:3 / 16:10 screens.
+        if (skipVideoBtn != null)
+        {
+            RectTransform rect = skipVideoBtn.GetComponent<RectTransform>();
+            if (rect != null)
+            {
+                rect.anchorMin = new Vector2(1f, 1f);
+                rect.anchorMax = new Vector2(1f, 1f);
+                rect.pivot = new Vector2(1f, 1f);
+                rect.anchoredPosition = new Vector2(-32f, -32f);
+                rect.sizeDelta = new Vector2(176f, 52f);
+                rect.localScale = Vector3.one;
+            }
+
+            Image image = skipVideoBtn.GetComponent<Image>();
+            if (image != null) image.color = new Color(1f, 1f, 1f, 0.96f);
+
+            TMP_Text label = skipVideoBtn.GetComponentInChildren<TMP_Text>(true);
+            if (label != null)
+            {
+                label.text = "SKIP";
+                label.fontSize = 22f;
+                label.alignment = TextAlignmentOptions.Center;
+                label.color = new Color(0.12f, 0.12f, 0.15f, 1f);
+                label.raycastTarget = false;
+            }
+        }
     }
 
     private static void Stretch(RectTransform target)

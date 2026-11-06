@@ -16,6 +16,7 @@ public class PhotonGameplayReplicator : MonoBehaviourPunCallbacks, IOnEventCallb
 {
     private const byte PoseEventCode = 71;
     private const byte PoseSyncRequestCode = 72;
+    public const byte SquadSceneTransitionEventCode = 89;
     private const string CompletedProperty = "CaseComplete";
     private const string ActiveCaseSceneProperty = "ActiveCaseScene";
     private readonly Dictionary<int, RemotePlayerReplica> remotePlayers = new Dictionary<int, RemotePlayerReplica>();
@@ -63,6 +64,13 @@ public class PhotonGameplayReplicator : MonoBehaviourPunCallbacks, IOnEventCallb
         {
             loadingSceneTarget = "";
         }
+
+        // إخفاء شاشة الانتقال إذا كان الفيديو غير مشتغل في المشهد الجديد
+        if (!CaseIntroCutscene.IsPlaying)
+        {
+            UIManager.HideTransitionWaitingScreen();
+        }
+
         if (savedCheckpointScene != currentScene)
         {
             savedCheckpointScene = currentScene;
@@ -313,7 +321,12 @@ public class PhotonGameplayReplicator : MonoBehaviourPunCallbacks, IOnEventCallb
     public override void OnRoomPropertiesUpdate(ExitGames.Client.Photon.Hashtable propertiesThatChanged)
     {
         base.OnRoomPropertiesUpdate(propertiesThatChanged);
-        // لا نقوم بتحميل المشهد يدوياً هنا لأن PhotonNetwork.AutomaticallySyncScene يتكفل بنقل كل المتصلين مع الهوست مرة واحدة بدون تكرار تحميل المشهد!
+        
+        // عند تحديث خصائص الغرفة (مثل ActiveCaseScene أو InterrogationStage)، نتأكد من مزامنة المشهد والمرحلة فوراً
+        if (propertiesThatChanged != null && propertiesThatChanged.ContainsKey(ActiveCaseSceneProperty))
+        {
+            CheckAndSyncActiveCaseScene();
+        }
     }
 
     private void RestoreLocalPlayerCustomProperties()
@@ -402,6 +415,16 @@ public class PhotonGameplayReplicator : MonoBehaviourPunCallbacks, IOnEventCallb
             if (!string.Equals(currentScene, targetScene, System.StringComparison.OrdinalIgnoreCase) &&
                 targetScene.StartsWith("Case"))
             {
+                // إذا كان تلقائياً تتم المزامنة عبر الفوتون AutomaticallySyncScene، نظهر واجهة الانتظار وندع PUN يقوم بالنقل المتزامن
+                if (PhotonNetwork.AutomaticallySyncScene)
+                {
+                    if (UIManager.Instance != null)
+                    {
+                        UIManager.Instance.ShowTransitionWaitingScreen("TRANSITIONING TO CASE 02\nSYNCHRONIZING WITH SQUAD...");
+                    }
+                    return true;
+                }
+
                 // منع تحميل المشهد مرتين إذا كان الانتقال جارياً بالفعل
                 if (string.Equals(loadingSceneTarget, targetScene, System.StringComparison.OrdinalIgnoreCase) &&
                     Time.unscaledTime - loadingSceneStartTime < 8f)
@@ -421,7 +444,7 @@ public class PhotonGameplayReplicator : MonoBehaviourPunCallbacks, IOnEventCallb
 
                 if (UIManager.Instance != null)
                 {
-                    UIManager.Instance.ShowOnScreenNotification("SQUAD MOVED TO CASE 02 // SYNCHRONIZING...", 4f);
+                    UIManager.Instance.ShowTransitionWaitingScreen("TRANSITIONING TO CASE 02\nSYNCHRONIZING WITH SQUAD...");
                 }
 
                 SceneManager.LoadScene(targetScene);
@@ -453,6 +476,20 @@ public class PhotonGameplayReplicator : MonoBehaviourPunCallbacks, IOnEventCallb
     public void OnEvent(EventData photonEvent)
     {
         if (!PhotonNetwork.InRoom) return;
+
+        if (photonEvent.Code == SquadSceneTransitionEventCode)
+        {
+            string targetScene = photonEvent.CustomData as string;
+            if (!string.IsNullOrEmpty(targetScene))
+            {
+                Debug.Log($"<color=cyan>[SQUAD TRANSITION]</color> Received transition to {targetScene} from Host.");
+                if (UIManager.Instance != null)
+                {
+                    UIManager.Instance.ShowTransitionWaitingScreen("TRANSITIONING TO CASE 02\nWAITING FOR SQUAD TO ASSEMBLE...");
+                }
+            }
+            return;
+        }
 
         if (photonEvent.Code == PoseSyncRequestCode)
         {

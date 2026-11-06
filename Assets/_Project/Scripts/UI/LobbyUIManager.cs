@@ -272,8 +272,11 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
             MaxPlayers = 4,
             IsVisible = true,
             IsOpen = true,
-            PlayerTtl = 120000,
-            EmptyRoomTtl = 60000
+            // PlayerTtl must be 0: otherwise players who leave stay as "inactive"
+            // ghosts that still occupy a slot, so the 4th player gets "room full".
+            PlayerTtl = 0,
+            EmptyRoomTtl = 0,
+            CleanupCacheOnLeave = true
         };
 
         UpdateStatus($"Creating Room {roomCode}...");
@@ -410,6 +413,14 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
         {
             HandleRoleDuplicate();
         }
+
+        // The 4th player's role often arrives after they enter; retry the start.
+        TryStartMatchWhenFull();
+    }
+
+    private static int ActivePlayerCount()
+    {
+        return PhotonNetwork.InRoom ? PhotonNetwork.PlayerList.Length : 0;
     }
 
     public override void OnJoinRoomFailed(short returnCode, string message)
@@ -823,7 +834,7 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
                 yield break;
             }
 
-            if (PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers && !HasDuplicateRoles())
+            if (ActivePlayerCount() >= PhotonNetwork.CurrentRoom.MaxPlayers && !HasDuplicateRoles())
             {
                 string targetScene = PlayerPrefs.GetString("Selected_Case", "Case01_Main");
                 PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
@@ -934,7 +945,8 @@ public class LobbyUIManager : MonoBehaviourPunCallbacks
     private void TryStartMatchWhenFull()
     {
         if (!autoStartWhenRoomFull || !PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom) return;
-        if (PhotonNetwork.CurrentRoom.PlayerCount != PhotonNetwork.CurrentRoom.MaxPlayers) return;
+        if (ActivePlayerCount() < PhotonNetwork.CurrentRoom.MaxPlayers) return;
+        if (matchStarting) return;
         UpdateStatus("ROOM FULL // LOADING GAME...");
         OnStartGameClicked();
     }

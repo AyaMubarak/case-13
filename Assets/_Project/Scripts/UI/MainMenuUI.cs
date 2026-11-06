@@ -198,7 +198,23 @@ public class MainMenuUI : MonoBehaviour
 
     public void OpenQuitPanel()
     {
-        if (quitPanel != null) quitPanel.SetActive(true);
+        if (quitPanel == null) return;
+
+        // Make sure every parent is active, then draw the panel above the main menu
+        // (OpenMainMenu moves mainMenuPanel to the last sibling, which was hiding this panel).
+        Transform t = quitPanel.transform.parent;
+        while (t != null)
+        {
+            if (!t.gameObject.activeSelf) t.gameObject.SetActive(true);
+            t = t.parent;
+        }
+        quitPanel.transform.SetAsLastSibling();
+        quitPanel.SetActive(true);
+    }
+
+    public void CloseQuitPanel()
+    {
+        if (quitPanel != null) quitPanel.SetActive(false);
     }
 
     public void ConfirmQuitGame()

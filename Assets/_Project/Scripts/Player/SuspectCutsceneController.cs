@@ -35,6 +35,7 @@ public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventC
     public const byte InterrogationStartEventCode = 85;
     public const byte InterrogationDialogueEventCode = 86;
     public const byte InterrogationAnimEventCode = 87;
+    public const byte InterrogationCaseSolvedEventCode = 88;
 
     [System.Serializable]
     public class SuspectData
@@ -1011,7 +1012,7 @@ public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventC
         {
             suspect.animator.ResetTrigger("StopTalking");
             suspect.animator.SetTrigger("StartTalking");
-            BroadcastSuspectAnim(currentSuspectTurn, "StartTalking");
+            BroadcastSuspectAnim(suspect == suspect1 ? 1 : 2, "StartTalking");
         }
 
         string susName = !string.IsNullOrEmpty(suspect.suspectName) ? suspect.suspectName.ToUpper() : "SUSPECT";
@@ -1042,7 +1043,7 @@ public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventC
         {
             suspect.animator.ResetTrigger("StartTalking");
             suspect.animator.SetTrigger("StopTalking");
-            BroadcastSuspectAnim(currentSuspectTurn, "StopTalking");
+            BroadcastSuspectAnim(suspect == suspect1 ? 1 : 2, "StopTalking");
         }
 
         yield return new WaitForSeconds(0.5f);
@@ -1107,8 +1108,6 @@ public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventC
         {
             evanLogText.text = $"<b>Question:</b> \"{suspect1.detectiveDialogueText}\"\n\n<b>Evan:</b> \"{suspect1.suspectDialogueText}\"";
         }
-
-        OpenLogPanel();
     }
 
     public void PlayNoraInterrogation(bool isPlayerMale)
@@ -1125,8 +1124,54 @@ public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventC
         {
             noraLogText.text = $"<b>Question:</b> \"{suspect2.detectiveDialogueText}\"\n\n<b>Nora:</b> \"{suspect2.suspectDialogueText}\"";
         }
+    }
 
-        OpenLogPanel();
+    public bool IsLocalPlayerInterrogator()
+    {
+        if (PlayerPrefs.GetInt("Game_Mode", 1) == 0 || !PhotonNetwork.InRoom) return true;
+
+        // التحقق أولاً من بروبرتيز الفوتون للّاعب المحلي (وهي المصدر الرسمي المتزامن بالكامل مع اللوبي)
+        if (PhotonNetwork.LocalPlayer != null && PhotonNetwork.LocalPlayer.CustomProperties != null &&
+            PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue("Role", out object localRoleObj) && localRoleObj != null)
+        {
+            string r = localRoleObj.ToString().ToLowerInvariant();
+            if (r.Contains("interrogat")) return true;
+        }
+
+        // فحص بديل عبر PlayerPrefs في حال اللعب أوفلاين أو تعذر قراءة الفوتون
+        string savedRole = PlayerPrefs.GetString("Player_Role", "");
+        if (!string.IsNullOrEmpty(savedRole) && savedRole.ToLowerInvariant().Contains("interrogat"))
+        {
+            return true;
+        }
+
+        if (PlayerProfile.LocalPlayer != null &&
+            (PlayerProfile.LocalPlayer.currentRole == DetectiveRole.Interrogator ||
+             PlayerProfile.LocalPlayer.currentRole == DetectiveRole.Any))
+        {
+            return true;
+        }
+
+        // إذا لم يكن هناك أي لاعب في الغرفة يحمل دور المحقق (مثلاً الجميع اختاروا أدواراً أخرى)، نتيح للجميع للتفادي
+        if (PhotonNetwork.InRoom && PhotonNetwork.PlayerList != null)
+        {
+            bool anyInterrogatorOnline = false;
+            foreach (var p in PhotonNetwork.PlayerList)
+            {
+                if (p == null || p.IsInactive) continue;
+                if (p.CustomProperties != null && p.CustomProperties.TryGetValue("Role", out object roleObj) && roleObj != null)
+                {
+                    if (roleObj.ToString().ToLowerInvariant().Contains("interrogat"))
+                    {
+                        anyInterrogatorOnline = true;
+                        break;
+                    }
+                }
+            }
+            if (!anyInterrogatorOnline) return true;
+        }
+
+        return false;
     }
 
     public void OpenLogPanel()
@@ -1245,8 +1290,21 @@ public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventC
                 hlg.childAlignment = TextAnchor.MiddleCenter;
             }
 
-            SetupSuspectCardUI(cardsContainer.Find("Card_Evan"), suspect1);
-            SetupSuspectCardUI(cardsContainer.Find("Card_Nora"), suspect2);
+            Transform firstCard = cardsContainer.Find("Card_Evan");
+            Transform secondCard = cardsContainer.Find("Card_Nora");
+            if (firstCard == null || secondCard == null)
+            {
+                List<Transform> directCards = new List<Transform>();
+                for (int i = 0; i < cardsContainer.childCount; i++)
+                {
+                    Transform child = cardsContainer.GetChild(i);
+                    if (child.GetComponent<Image>() != null) directCards.Add(child);
+                }
+                if (firstCard == null && directCards.Count > 0) firstCard = directCards[0];
+                if (secondCard == null && directCards.Count > 1) secondCard = directCards[1];
+            }
+            SetupSuspectCardUI(firstCard, suspect1);
+            SetupSuspectCardUI(secondCard, suspect2);
 
             LayoutRebuilder.ForceRebuildLayoutImmediate(cardsRt);
         }
@@ -1400,7 +1458,7 @@ public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventC
             TMP_Text repTxt = replayBtn.GetComponentInChildren<TMP_Text>();
             if (repTxt != null)
             {
-                repTxt.text = "<b>PLAY AUDIO TRANSCRIPT</b>";
+                repTxt.text = "<b>REPLAY STATEMENT</b>";
                 repTxt.fontSize = 13.5f;
                 repTxt.color = Color.white;
                 repTxt.alignment = TextAlignmentOptions.Center;
@@ -1461,50 +1519,48 @@ public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventC
     {
         Debug.Log($"<color=orange>[ACCUSATION]</color> Player accused: <b>{accusedName}</b>");
         
-        GuiltySelectionBoard guiltyBoard = Object.FindAnyObjectByType<GuiltySelectionBoard>();
-        if (guiltyBoard != null)
+        bool isGuilty = accusedName.ToLower().Contains("nora") || accusedName.ToLower().Contains("elena");
+        if (isGuilty)
         {
-            guiltyBoard.SelectSuspect(accusedName);
-            bool isMatch = accusedName.ToLower().Contains("nora") || accusedName.ToLower().Contains("elena");
-            if (isMatch) SetRoomInterrogationStage(5);
-        }
-        else
-        {
-            // فحص الاتهام (Nora Blake في القضية الأولى أو Elena Rostova في القضية الثانية)
-            bool isGuilty = accusedName.ToLower().Contains("nora") || accusedName.ToLower().Contains("elena");
-            if (isGuilty)
+            SetRoomInterrogationStage(5);
+            if (ScoreManager.Instance != null)
             {
-                SetRoomInterrogationStage(5);
-                if (ScoreManager.Instance != null)
-                {
-                    ScoreManager.Instance.AddScore(100);
-                }
+                ScoreManager.Instance.AddScore(100);
+            }
 
-                if (UIManager.Instance != null)
-                {
-                    UIManager.Instance.ShowOnScreenNotification($"CORRECT ACCUSATION! {accusedName.ToUpper()} APPREHENDED. CASE CLOSED!");
-                }
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.ShowOnScreenNotification($"CORRECT ACCUSATION! {accusedName.ToUpper()} APPREHENDED. CASE CLOSED!");
+            }
 
-                AudioClip winClip = Resources.Load<AudioClip>("Audio/meldix-success-340660");
-                if (winClip != null && Camera.main != null)
-                {
-                    AudioSource.PlayClipAtPoint(winClip, Camera.main.transform.position);
-                }
+            AudioClip winClip = Resources.Load<AudioClip>("Audio/meldix-success-340660");
+            if (winClip != null && Camera.main != null)
+            {
+                AudioSource.PlayClipAtPoint(winClip, Camera.main.transform.position);
+            }
 
-                StartCoroutine(ShowEndGameDelayed(1.8f));
+            // بث فوز القضية مباشرة لجميع الأجهزة في الغرفة لتفادي أي تأخير بالـ Room Properties
+            if (PhotonNetwork.InRoom)
+            {
+                PhotonNetwork.RaiseEvent(InterrogationCaseSolvedEventCode, accusedName,
+                    new RaiseEventOptions { Receivers = ReceiverGroup.All }, SendOptions.SendReliable);
             }
             else
             {
-                if (UIManager.Instance != null)
-                {
-                    UIManager.Instance.ShowOnScreenNotification($"WRONG ACCUSATION! {accusedName.ToUpper()} IS INNOCENT.");
-                }
+                StartCoroutine(ShowEndGameDelayed(1.8f));
+            }
+        }
+        else
+        {
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.ShowOnScreenNotification($"WRONG ACCUSATION! {accusedName.ToUpper()} IS INNOCENT.");
+            }
 
-                AudioClip errorClip = Resources.Load<AudioClip>("Audio/u_xg7ssi08yr-error-tone-10-363618");
-                if (errorClip != null && Camera.main != null)
-                {
-                    AudioSource.PlayClipAtPoint(errorClip, Camera.main.transform.position);
-                }
+            AudioClip errorClip = Resources.Load<AudioClip>("Audio/u_xg7ssi08yr-error-tone-10-363618");
+            if (errorClip != null && Camera.main != null)
+            {
+                AudioSource.PlayClipAtPoint(errorClip, Camera.main.transform.position);
             }
         }
 
@@ -1582,29 +1638,47 @@ public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventC
             currentSuspect.suspectObject.gameObject.SetActive(false);
         }
 
+        // نحدد المرحلة حسب المتهم الذي أنهى كلامه فعلاً، وليس حسب currentSuspectTurn:
+        // في الـ Co-op قد يُنهي جهاز آخر استجواب إيفن أولاً فتصل مزامنة المرحلة 2 وتغيّر الدور إلى 2
+        // بينما حوار إيفن ما زال يعمل هنا. سابقاً كان ذلك يُعتبر نهاية نورا فيقفز الجميع للمرحلة 4
+        // ويفتح ملف المتهمين وتختفي نورا من بقية الأجهزة.
+        bool isFirstSuspect = currentSuspect == suspect1;
+
+        if (isFirstSuspect)
+        {
+            // إنهاء مشهد الكاميرا والعودة لكاميرا اللاعب الطبيعية
+            DeactivateSuspectCamera();
+
+            // إيفن/فيكتور انتهى: الانتقال فوراً لنورا/إيلينا وتفعيلها للجميع
+            SetRoomInterrogationStage(2);
+            NextSuspect();
+            return;
+        }
+
         // إنهاء مشهد الكاميرا والعودة لكاميرا اللاعب الطبيعية واستعادة تحكم ومجسم اللاعب
         DeactivateSuspectCamera();
 
-        if (currentSuspectTurn == 1)
+        // نورا/إيلينا انتهت رسمياً: الآن فقط يتم اعتبار كلا المتهمين منتهيين
+        AreBothSuspectsCompleted = true;
+        SetRoomInterrogationStage(4);
+        if (CaseDossierManager.Instance != null)
         {
-            SetRoomInterrogationStage(2);
-            NextSuspect();
+            CaseDossierManager.Instance.UnlockDossierAfterInterrogation();
         }
-        else if (currentSuspectTurn == 2)
+        if (UIManager.Instance != null)
         {
-            AreBothSuspectsCompleted = true;
-            SetRoomInterrogationStage(4);
-            if (CaseDossierManager.Instance != null)
-            {
-                CaseDossierManager.Instance.UnlockDossierAfterInterrogation();
-            }
-            if (UIManager.Instance != null)
-            {
-                UIManager.Instance.UnlockDossierAccess();
-            }
-            ShowTranscriptsButtonAtFilesPosition();
+            UIManager.Instance.UnlockDossierAccess();
+        }
+        ShowTranscriptsButtonAtFilesPosition();
+        StartCoroutine(OpenDossierNextFrame());
+    }
+
+    private IEnumerator OpenDossierNextFrame()
+    {
+        yield return null;
+        yield return new WaitForEndOfFrame();
+        if (AreBothSuspectsCompleted)
             OpenLogPanel();
-        }
     }
 
     public void NextSuspect()
@@ -1658,7 +1732,7 @@ public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventC
                 transBtn.onClick.AddListener(OpenLogPanel);
             }
 
-            // إظهار زر المتهمين
+            // إظهار زر المتهمين لجميع اللاعبين ليتمكن الجميع من مراجعة الأقوال
             btnOpenTranscripts.SetActive(true);
         }
     }
@@ -1754,6 +1828,18 @@ public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventC
                 }
                 Debug.Log($"<color=green>[PUN SYNC ANIM]</color> Triggered {trigger} on Suspect {sIndex}");
             }
+        }
+        // 4. مزامنة فوز القضية واختيار المذنب الصحيح لكافة أجهزة الفريق
+        else if (photonEvent.Code == InterrogationCaseSolvedEventCode)
+        {
+            string accusedName = photonEvent.CustomData as string;
+            CloseLogPanel();
+            if (UIManager.Instance != null)
+            {
+                string nameDisplay = !string.IsNullOrEmpty(accusedName) ? accusedName.ToUpper() : "GUILTY";
+                UIManager.Instance.ShowOnScreenNotification($"CASE SOLVED BY SQUAD! {nameDisplay} APPREHENDED.", 4f);
+            }
+            StartCoroutine(ShowEndGameDelayed(1.5f));
         }
     }
 
@@ -1860,6 +1946,14 @@ public class SeparateInterrogationManager : MonoBehaviourPunCallbacks, IOnEventC
         }
         else if (stage >= 4)
         {
+            // إذا كان مشهد حوار نورا أو إيفن لا يزال يعمل محلياً عند هذا اللاعب، لا نقاطعه فوراً!
+            // ننتظر حتى ينتهي الحوار الطبيعي ليرى اللاعب نورا وتكمل حوارها قبل الانتقال للملف
+            if (isInterrogating)
+            {
+                Debug.Log("<color=yellow>[INTERROGATION SYNC]</color> Stage 4 received but dialogue still playing locally. Will finish dialogue first.");
+                return;
+            }
+
             StopAllCoroutines();
             isInterrogating = false;
             AreBothSuspectsCompleted = true;

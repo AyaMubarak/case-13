@@ -288,6 +288,9 @@ public class CaseIntroCutscene : MonoBehaviour
         isCutsceneFinished = false;
         IsPlaying = true;
 
+        // إخفاء شاشة الانتظار TransitionWaitingScreen بمجرد بدء عرض الكاتسين
+        UIManager.HideTransitionWaitingScreen();
+
         // تعطيل حركة اللاعب وأي واجهات أخرى أثناء العرض
         ToggleGameplay(false);
 
@@ -329,6 +332,8 @@ public class CaseIntroCutscene : MonoBehaviour
         }
 
         if (gameplayMusic != null) gameplayMusic.ResumeAfterOverlay();
+
+        UIManager.HideTransitionWaitingScreen();
 
         if (videoPlayer != null)
         {
@@ -507,8 +512,8 @@ public class CaseIntroCutscene : MonoBehaviour
                 buttonRect.anchorMin = new Vector2(1f, 1f);
                 buttonRect.anchorMax = new Vector2(1f, 1f);
                 buttonRect.pivot = new Vector2(1f, 1f);
-                buttonRect.anchoredPosition = new Vector2(-30f, -30f);
-                buttonRect.sizeDelta = new Vector2(200f, 50f);
+                buttonRect.anchoredPosition = new Vector2(-32f, -32f);
+                buttonRect.sizeDelta = new Vector2(176f, 52f);
                 buttonRect.localScale = Vector3.one;
             }
 
@@ -529,9 +534,9 @@ public class CaseIntroCutscene : MonoBehaviour
             }
             if (tmp != null)
             {
-                tmp.text = "SKIP >>";
+                tmp.text = "SKIP";
                 tmp.alignment = TextAlignmentOptions.Center;
-                tmp.fontSize = 24f;
+                tmp.fontSize = 22f;
                 tmp.color = new Color(0.2f, 0.2f, 0.2f, 1f);
                 tmp.raycastTarget = false;
             }
@@ -548,9 +553,9 @@ public class CaseIntroCutscene : MonoBehaviour
                 }
                 else
                 {
-                    legacy.text = "SKIP >>";
+                    legacy.text = "SKIP";
                     legacy.alignment = TextAnchor.MiddleCenter;
-                    legacy.fontSize = 24;
+                    legacy.fontSize = 22;
                     legacy.color = new Color(0.2f, 0.2f, 0.2f, 1f);
                     legacy.raycastTarget = false;
                 }
